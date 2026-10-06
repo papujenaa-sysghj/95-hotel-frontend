@@ -2,6 +2,14 @@ import { z } from 'zod';
 export const guestStep = z.object({
   guestName: z.string().min(2, 'Enter the guest’s full name'), phone: z.string().regex(/^[+\d][\d\s-]{6,}$/, 'Enter a valid phone number'),
   email: z.string().email('Enter a valid email').or(z.literal('')).optional(), address: z.string().optional(), idType: z.string().optional(), idNumber: z.string().optional(),
+  idDocumentUrl: z.string().optional(),
+  coGuests: z.array(z.object({
+    name: z.string().optional(),
+    phone: z.string().optional(),
+    idType: z.string().optional(),
+    idNumber: z.string().optional(),
+    idDocumentUrl: z.string().optional(),
+  })).optional(),
 });
 export const stayStep = z.object({
   checkInDate: z.string().min(1, 'Choose a check-in date'), checkOutDate: z.string().min(1, 'Choose a check-out date'),

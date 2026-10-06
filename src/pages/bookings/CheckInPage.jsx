@@ -266,13 +266,13 @@ export default function CheckInPage() {
                       </div>
 
                       {/* Right Actions */}
-                      <div className="flex flex-col gap-2 items-end sm:border-l border-slate-100 sm:pl-4">
+                      <div className="flex flex-wrap sm:flex-col gap-2 items-stretch sm:items-end sm:border-l border-slate-100 sm:pl-4 pt-2 sm:pt-0">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             go.mutate(b._id);
                           }}
-                          className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-xs"
+                          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 sm:py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-xs min-h-[40px]"
                         >
                           Complete Check-in
                         </button>
@@ -281,7 +281,7 @@ export default function CheckInPage() {
                             e.stopPropagation();
                             openBookingDrawer(b._id);
                           }}
-                          className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 sm:py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors min-h-[40px]"
                         >
                           Verify ID
                         </button>
@@ -290,9 +290,9 @@ export default function CheckInPage() {
                             e.stopPropagation();
                             openBookingDrawer(b._id);
                           }}
-                          className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 sm:py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors min-h-[40px]"
                         >
-                          <Eye className="h-3.5 w-3.5" /> View Booking
+                          <Eye className="h-3.5 w-3.5" /> View
                         </button>
                       </div>
                     </div>

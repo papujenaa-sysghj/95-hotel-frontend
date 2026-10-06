@@ -480,8 +480,112 @@ export default function GuestsPage() {
         </div>
       </div>
 
-      {/* Main Guests Table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
+      {/* Mobile Guest Cards View (< md) */}
+      <div className="space-y-3 md:hidden">
+        {paginatedRows.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-400 font-medium">
+            No guests found matching the selected filters.
+          </div>
+        ) : (
+          paginatedRows.map((r) => {
+            const initials = r.name
+              ? r.name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join('')
+              : 'G';
+
+            const avatarStyle = r.avatarBg || 'bg-blue-100 text-blue-700';
+
+            return (
+              <div
+                key={r._id}
+                onClick={() => setSelectedGuest(r)}
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3 active:bg-slate-50 transition cursor-pointer"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={cx('grid h-10 w-10 shrink-0 place-items-center rounded-full text-xs font-black', avatarStyle)}>
+                      {initials}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-slate-900 leading-tight">{r.name}</h4>
+                      <p className="text-[11px] font-bold text-slate-400 mt-0.5">Guest ID: {r.guestId || 'GST-00001'}</p>
+                    </div>
+                  </div>
+                  <span
+                    className={cx(
+                      'inline-block rounded-lg px-2.5 py-0.5 text-[10px] font-extrabold border',
+                      r.status === 'Past Guest'
+                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                        : 'bg-blue-50 text-blue-700 border-blue-200'
+                    )}
+                  >
+                    {r.status || 'New Guest'}
+                  </span>
+                </div>
+
+                {/* Contact with tel and mailto links */}
+                <div className="space-y-1.5 pt-1 text-xs">
+                  {r.phone && (
+                    <a
+                      href={`tel:${r.phone}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-2 font-bold text-blue-600 hover:underline min-h-[36px]"
+                    >
+                      <Phone className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                      <span>{r.phone}</span>
+                    </a>
+                  )}
+                  {r.email && (
+                    <a
+                      href={`mailto:${r.email}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-2 text-slate-600 hover:text-blue-600 hover:underline min-h-[36px]"
+                    >
+                      <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{r.email}</span>
+                    </a>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs">
+                  <div>
+                    <span className="text-slate-400 font-medium">Stays: </span>
+                    <b className="text-slate-800">{r.totalStays ?? 0}</b>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium">Spent: </span>
+                    <b className="text-slate-900">{money(r.totalSpent || 0)}</b>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 pt-1 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => setSelectedGuest(r)}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 min-h-[40px]"
+                  >
+                    <Eye className="h-3.5 w-3.5" /> View
+                  </button>
+                  {can('guests.edit') && (
+                    <button
+                      onClick={() => setEditModal(r)}
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 min-h-[40px]"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Main Desktop Guests Table (hidden on mobile) */}
+      <div className="hidden md:block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-semibold text-slate-700">
             <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">

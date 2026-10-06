@@ -20,20 +20,112 @@ export default function CrudPage({ title, subtitle, embedded, api, queryKey, col
   const errs = f.formState.errors; const isNew = !editing?._id;
   const cols = [...columns, ...((can(perms.edit) || can(perms.delete) || rowActions) ? [{ key: '_a', header: '', className: 'text-right', render: (r) => <div className="flex justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>{rowActions?.(r)}{perms.edit && can(perms.edit) && <button className="btn-ghost btn-sm" onClick={() => open(r)} aria-label="Edit"><Pencil className="h-3.5 w-3.5" /></button>}{perms.delete && can(perms.delete) && <button className="btn-ghost btn-sm text-red-600" onClick={() => setDel(r)} aria-label="Delete"><Trash2 className="h-3.5 w-3.5" /></button>}</div> }] : [])];
   const body = <>
-    <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 p-4">{searchable && <div className="relative w-full max-w-xs"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><input className="input pl-9" placeholder={`Search ${noun}s`} value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} aria-label={`Search ${noun}s`} /></div>}
-      {embedded && perms.create && can(perms.create) && <button className="btn-primary ml-auto" onClick={() => open()}><Plus className="h-4 w-4" />Add {noun}</button>}</div>
-    <QueryBoundary q={list} isEmpty={!rows.length} empty={<EmptyState title={q ? `No ${noun}s match “${q}”` : `No ${noun}s yet`} message={q ? 'Try a different search.' : `Add the first ${noun} to get started.`} action={!q && perms.create && can(perms.create) && <button className="btn-primary" onClick={() => open()}><Plus className="h-4 w-4" />Add {noun}</button>} />}>
-      <DataTable columns={cols} rows={rows} onRowClick={onRowClick} /><Pager page={page} total={list.data?.total || rows.length} limit={pageSize} onPage={setPage} /></QueryBoundary></>;
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-slate-100 p-3.5 sm:p-4">
+      {searchable && (
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+          <input
+            className="input pl-10"
+            placeholder={`Search ${noun}s...`}
+            value={q}
+            onChange={(e) => { setQ(e.target.value); setPage(1); }}
+            aria-label={`Search ${noun}s`}
+          />
+        </div>
+      )}
+      {embedded && perms.create && can(perms.create) && (
+        <button className="btn-primary w-full sm:w-auto sm:ml-auto" onClick={() => open()}>
+          <Plus className="h-4 w-4" />Add {noun}
+        </button>
+      )}
+    </div>
+    <QueryBoundary
+      q={list}
+      isEmpty={!rows.length}
+      empty={
+        <EmptyState
+          title={q ? `No ${noun}s match “${q}”` : `No ${noun}s yet`}
+          message={q ? 'Try a different search.' : `Add the first ${noun} to get started.`}
+          action={!q && perms.create && can(perms.create) && (
+            <button className="btn-primary" onClick={() => open()}>
+              <Plus className="h-4 w-4" />Add {noun}
+            </button>
+          )}
+        />
+      }
+    >
+      <DataTable columns={cols} rows={rows} onRowClick={onRowClick} />
+      <Pager page={page} total={list.data?.total || rows.length} limit={pageSize} onPage={setPage} />
+    </QueryBoundary>
+  </>;
+
   return <>
-    {!embedded && <PageHeader title={title} subtitle={subtitle} actions={perms.create && can(perms.create) && <button className="btn-primary" onClick={() => open()}><Plus className="h-4 w-4" />Add {noun}</button>} />}
+    {!embedded && (
+      <PageHeader
+        title={title}
+        subtitle={subtitle}
+        actions={perms.create && can(perms.create) && (
+          <button className="btn-primary w-full sm:w-auto" onClick={() => open()}>
+            <Plus className="h-4 w-4" />Add {noun}
+          </button>
+        )}
+      />
+    )}
     <Card pad={false}>{body}</Card>
-    <Modal open={!!editing} onClose={() => setEditing(null)} title={`${isNew ? 'Add' : 'Edit'} ${noun}`} size="md" footer={<><button className="btn-ghost" onClick={() => setEditing(null)}>Cancel</button><button className="btn-primary" disabled={save.isPending} onClick={f.handleSubmit((v) => save.mutate(v))}>{save.isPending && <Spinner />}Save {noun}</button></>}>
-      <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e) => e.preventDefault()}>{fields.filter((x) => !(x.createOnly && !isNew)).map((x) => <Field key={x.name} label={x.label} hint={x.hint} error={errs[x.name]?.message} className={x.full ? 'sm:col-span-2' : ''}>
-        {x.type === 'select' ? <select className="input" {...f.register(x.name)}><option value="">Select…</option>{x.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select> :
-          x.type === 'checkbox' ? <label className="flex items-center gap-2 pt-1 text-sm"><input type="checkbox" className="h-4 w-4 rounded" {...f.register(x.name)} />{x.checkLabel || 'Yes'}</label> :
-          x.type === 'textarea' ? <textarea className="input" rows={2} {...f.register(x.name)} /> :
-          x.type === 'multi' ? <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-slate-200 p-2">{x.options.map((o) => <label key={o.value} className="flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1 text-xs font-semibold"><input type="checkbox" value={o.value} {...f.register(x.name)} />{o.label}</label>)}</div> :
-          <input className="input" type={x.type || 'text'} step={x.type === 'number' ? 'any' : undefined} {...f.register(x.name)} />}</Field>)}</form></Modal>
-    <ConfirmDialog open={!!del} onClose={() => setDel(null)} onConfirm={() => remove.mutate()} busy={remove.isPending} danger confirmLabel={`Delete ${noun}`} title={`Delete this ${noun}?`} message="This cannot be undone. If it is still in use, the server will tell you why it can't be removed." />
+    <Modal
+      open={!!editing}
+      onClose={() => setEditing(null)}
+      title={`${isNew ? 'Add' : 'Edit'} ${noun}`}
+      size="md"
+      footer={
+        <>
+          <button className="btn-ghost w-full sm:w-auto" onClick={() => setEditing(null)}>Cancel</button>
+          <button className="btn-primary w-full sm:w-auto" disabled={save.isPending} onClick={f.handleSubmit((v) => save.mutate(v))}>
+            {save.isPending && <Spinner />}Save {noun}
+          </button>
+        </>
+      }
+    >
+      <form className="grid grid-cols-1 sm:grid-cols-2 gap-3.5" onSubmit={(e) => e.preventDefault()}>
+        {fields.filter((x) => !(x.createOnly && !isNew)).map((x) => (
+          <Field key={x.name} label={x.label} hint={x.hint} error={errs[x.name]?.message} className={x.full ? 'sm:col-span-2' : ''}>
+            {x.type === 'select' ? (
+              <select className="input" {...f.register(x.name)}>
+                <option value="">Select…</option>
+                {x.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            ) : x.type === 'checkbox' ? (
+              <label className="flex items-center gap-2 pt-1 text-sm font-semibold text-slate-700">
+                <input type="checkbox" className="h-4 w-4 rounded" {...f.register(x.name)} />
+                {x.checkLabel || 'Yes'}
+              </label>
+            ) : x.type === 'textarea' ? (
+              <textarea className="input" rows={3} {...f.register(x.name)} />
+            ) : x.type === 'multi' ? (
+              <div className="flex max-h-36 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-slate-200 p-2.5">
+                {x.options.map((o) => (
+                  <label key={o.value} className="flex items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+                    <input type="checkbox" value={o.value} {...f.register(x.name)} />
+                    {o.label}
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <input className="input" type={x.type || 'text'} step={x.type === 'number' ? 'any' : undefined} {...f.register(x.name)} />
+            )}
+          </Field>
+        ))}
+      </form>
+    </Modal>
+    <ConfirmDialog
+      open={!!del}
+      onClose={() => setDel(null)}
+      onConfirm={() => remove.mutate()}
+      busy={remove.isPending}
+      danger
+      confirmLabel={`Delete ${noun}`}
+      title={`Delete this ${noun}?`}
+      message="This cannot be undone. If it is still in use, the server will tell you why it can't be removed."
+    />
   </>;
 }

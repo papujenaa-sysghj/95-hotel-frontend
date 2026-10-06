@@ -157,7 +157,41 @@ export function DeparturesListWidget({ departures }) {
 export function BookingList({ items, columns, empty = 'No bookings' }) {
   const open = useUI((s) => s.openBooking);
   if (!items?.length) return <EmptyState title={empty} />;
-  return <DataTable rows={items} onRowClick={(b) => open(b._id)} columns={columns} />;
+
+  return (
+    <div>
+      {/* Mobile Card View */}
+      <div className="divide-y divide-slate-100 md:hidden">
+        {items.map((b) => (
+          <div
+            key={b._id || b.bookingNumber}
+            onClick={() => open(b._id)}
+            className="flex items-center justify-between p-3.5 active:bg-slate-50 transition cursor-pointer"
+          >
+            <div className="space-y-1 pr-2 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-blue-600 text-xs">{b.bookingNumber}</span>
+                <Badge status={b.bookingStatus} />
+              </div>
+              <p className="font-bold text-slate-900 text-xs truncate">{b.guest?.name || 'Guest'}</p>
+              <p className="text-[11px] text-slate-500">
+                Room {b.room?.roomNumber || 'TBD'} · {fmtDate(b.checkInDate, 'dd MMM')} → {fmtDate(b.checkOutDate, 'dd MMM')}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="font-extrabold text-slate-900 text-xs">{money(b.totalAmount)}</p>
+              <ChevronRight className="h-4 w-4 text-slate-400 ml-auto mt-1" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <DataTable rows={items} onRowClick={(b) => open(b._id)} columns={columns} />
+      </div>
+    </div>
+  );
 }
 
 export const recentCols = [

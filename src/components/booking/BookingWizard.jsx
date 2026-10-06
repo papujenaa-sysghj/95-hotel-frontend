@@ -34,12 +34,48 @@ function WizardInner({ opts, onClose, onDone }) {
   const f = useForm({
     mode: 'onTouched',
     defaultValues: {
-      guestName: '', phone: '9876543210', phonePrefix: '+91', email: '', address: '', idType: 'Aadhaar', idNumber: '', idDocumentUrl: '', nationality: 'Indian',
-      checkInDate: opts.checkIn || t, checkOutDate: opts.checkOut || iso(addDays(today(), 1)), adults: 1, children: 0, roomRate: 0, extraBedCharge: 0, otherCharges: 0, discount: 0,
+      guestName: '', phone: '', phonePrefix: '+91', email: '', address: '', idType: 'Aadhaar', idNumber: '', idDocumentUrl: '', nationality: 'Indian',
+      checkInDate: opts.checkIn || t, checkOutDate: opts.checkOut || iso(addDays(today(), 1)), adults: opts.adults || 1, children: 0, roomRate: 0, extraBedCharge: 0, otherCharges: 0, discount: 0,
       payAmount: 0, payMethod: 'cash', notes: '', checkInNow: walkIn
     }
   });
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [coGuests, setCoGuests] = useState([]);
+  const [uploadingCoGuestDocs, setUploadingCoGuestDocs] = useState({});
+
+  const v = f.watch();
+
+  // Keep coGuests array aligned with the number of adults
+  useEffect(() => {
+    const needed = Math.max(0, (Number(v.adults) || 1) - 1);
+    setCoGuests((prev) => {
+      const copy = [...prev];
+      while (copy.length < needed) {
+        copy.push({ name: '', idType: 'Aadhaar', idNumber: '', idDocumentUrl: '' });
+      }
+      return copy;
+    });
+  }, [v.adults]);
+
+  const updateCoGuest = (idx, field, val) => {
+    setCoGuests((prev) => {
+      const copy = [...prev];
+      if (!copy[idx]) copy[idx] = { name: '', idType: 'Aadhaar', idNumber: '', idDocumentUrl: '' };
+      copy[idx] = { ...copy[idx], [field]: val };
+      return copy;
+    });
+  };
+
+  const addCoGuest = () => {
+    const newAdults = (Number(v.adults) || 1) + 1;
+    f.setValue('adults', newAdults);
+  };
+
+  const removeCoGuest = (idx) => {
+    setCoGuests((prev) => prev.filter((_, i) => i !== idx));
+    const newAdults = Math.max(1, (Number(v.adults) || 1) - 1);
+    f.setValue('adults', newAdults);
+  };
 
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -58,7 +94,24 @@ function WizardInner({ opts, onClose, onDone }) {
     }
   };
 
-  const v = f.watch(); const nights = Math.max(0, differenceInCalendarDays(parseISO(v.checkOutDate || t), parseISO(v.checkInDate || t)));
+  const handleCoGuestFileUpload = async (idx, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    setUploadingCoGuestDocs((prev) => ({ ...prev, [idx]: true }));
+    try {
+      const res = await unwrap(api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }));
+      const urlStr = typeof res === 'string' ? res : (res?.url || res?.data?.url || '');
+      updateCoGuest(idx, 'idDocumentUrl', urlStr);
+    } catch (err) {
+      f.setError('root', { message: errMsg(err, `Failed to upload document for Guest ${idx + 2}`) });
+    } finally {
+      setUploadingCoGuestDocs((prev) => ({ ...prev, [idx]: false }));
+    }
+  };
+
+  const nights = Math.max(0, differenceInCalendarDays(parseISO(v.checkOutDate || t), parseISO(v.checkInDate || t)));
   const settings = useQuery({ queryKey: ['settings'], queryFn: () => unwrap(api.get('/settings')), staleTime: 300000 });
   const taxPercent = settings.data?.hotel?.booking?.taxPercent ?? 0;
   const totals = useMemo(() => calcTotals({ ...v, roomRate: Number(v.roomRate), nights, taxPercent, discount: Number(v.discount) }), [v.roomRate, v.extraBedCharge, v.otherCharges, v.discount, nights, taxPercent]);
@@ -85,8 +138,10 @@ function WizardInner({ opts, onClose, onDone }) {
 
   const submit = () => {
     const amt = payMode === 'unpaid' ? 0 : Number(v.payAmount);
+    const validCoGuests = coGuests.filter((cg) => cg.name?.trim() || cg.idNumber?.trim() || cg.idDocumentUrl);
     create.mutate({
       guest: { name: v.guestName, phone: v.phone, email: v.email || undefined, address: v.address || undefined, idType: v.idType || undefined, idNumber: v.idNumber || undefined, idDocumentUrl: v.idDocumentUrl || undefined, ...(known?._id && { _id: known._id }) },
+      coGuests: validCoGuests,
       room: room._id, checkInDate: v.checkInDate, checkOutDate: v.checkOutDate, adults: Number(v.adults), children: Number(v.children),
       ...(can('bookings.edit_rate') ? { roomRate: Number(v.roomRate) } : {}),
       extraBedCharge: Number(v.extraBedCharge), otherCharges: Number(v.otherCharges), discount: Number(v.discount), source: walkIn ? 'walk_in' : 'reception', notes: v.notes || undefined,
@@ -102,16 +157,27 @@ function WizardInner({ opts, onClose, onDone }) {
       size="xl"
       title={null}
       footer={
-        <div className="flex w-full items-center justify-between">
-          <button className="btn-ghost text-xs font-bold rounded-xl px-5 py-2.5" onClick={step > 0 ? () => setStep(step - 1) : onClose} disabled={create.isPending}>
-            {step > 0 ? 'Back' : 'Cancel'}
+        <div className="flex flex-col-reverse sm:flex-row w-full items-stretch sm:items-center justify-between gap-2.5">
+          <button
+            className="btn-ghost text-xs font-bold rounded-xl px-5 py-3 sm:py-2.5 w-full sm:w-auto min-h-[44px]"
+            onClick={step > 0 ? () => setStep(step - 1) : onClose}
+            disabled={create.isPending}
+          >
+            {step > 0 ? '← Back' : 'Cancel'}
           </button>
           {step < 5 ? (
-            <button className="btn-primary text-xs font-bold px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20" onClick={next}>
+            <button
+              className="btn-primary text-xs font-bold px-6 py-3 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 w-full sm:w-auto min-h-[44px]"
+              onClick={next}
+            >
               Continue to {STEPS[step + 1]?.label} <ArrowRight className="h-4 w-4 ml-1" />
             </button>
           ) : (
-            <button className="btn-primary text-xs font-bold px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20" onClick={submit} disabled={create.isPending}>
+            <button
+              className="btn-primary text-xs font-bold px-6 py-3 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 w-full sm:w-auto min-h-[44px]"
+              onClick={submit}
+              disabled={create.isPending}
+            >
               {create.isPending && <Spinner />} Confirm Booking
             </button>
           )}
@@ -119,23 +185,43 @@ function WizardInner({ opts, onClose, onDone }) {
       }
     >
       {/* Custom Header */}
-      <div className="mb-6 flex items-start justify-between border-b border-slate-100 pb-4">
+      <div className="mb-4 sm:mb-6 flex items-start justify-between border-b border-slate-100 pb-3 sm:pb-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-50 text-blue-600 border border-blue-100/80 shadow-2xs">
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-50 text-blue-600 border border-blue-100/80 shadow-2xs shrink-0">
             <Calendar className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-lg font-extrabold text-slate-900">{walkIn ? 'Walk-in Guest Reservation' : 'New Booking'}</h2>
-            <p className="text-xs font-medium text-slate-500">Create a new reservation for a guest</p>
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-900 leading-tight">
+              {walkIn ? 'Walk-in Guest Reservation' : 'New Booking'}
+            </h2>
+            <p className="text-[11px] sm:text-xs font-medium text-slate-500">Create a new reservation for a guest</p>
           </div>
         </div>
-        <button onClick={onClose} className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition">
+        <button
+          onClick={onClose}
+          className="grid h-9 w-9 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition shrink-0"
+          aria-label="Close"
+        >
           <X className="h-5 w-5" />
         </button>
       </div>
 
-      {/* 6 Step Stepper */}
-      <div className="mb-6 overflow-x-auto pb-2">
+      {/* Mobile Step Bar (< sm) */}
+      <div className="sm:hidden mb-4 rounded-xl bg-slate-50 border border-slate-200/80 p-3">
+        <div className="flex items-center justify-between text-xs font-bold text-slate-800 mb-1.5">
+          <span className="text-blue-600">Step {step + 1} of 6</span>
+          <span className="truncate ml-2">{STEPS[step]?.label}</span>
+        </div>
+        <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-blue-600 rounded-full transition-all duration-300"
+            style={{ width: `${((step + 1) / 6) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Desktop Stepper (sm+) */}
+      <div className="hidden sm:block mb-6 overflow-x-auto pb-2 cal-scroll">
         <ol className="flex items-center justify-between min-w-[640px] px-2" aria-label="Progress">
           {STEPS.map((s, i) => (
             <li key={s.label} className="flex items-center gap-2">
@@ -246,7 +332,7 @@ function WizardInner({ opts, onClose, onDone }) {
                 </div>
               </Field>
 
-              <Field label="Aadhaar / ID Card Document Upload" className="sm:col-span-2">
+              <Field label="Aadhaar / ID Card Document Upload (Optional)" className="sm:col-span-2">
                 <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 p-3">
                   {v.idDocumentUrl ? (
                     <div className="flex items-center justify-between w-full gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-900">
@@ -278,7 +364,7 @@ function WizardInner({ opts, onClose, onDone }) {
                           <Camera className="h-4.5 w-4.5" />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-800">Upload Aadhaar Card / ID Document</p>
+                          <p className="text-xs font-bold text-slate-800">Upload Aadhaar Card / ID Document (Optional)</p>
                           <p className="text-[10px] text-slate-400">Scan or photo of Aadhaar Card, Passport or DL (Image or PDF)</p>
                         </div>
                       </div>
@@ -300,8 +386,155 @@ function WizardInner({ opts, onClose, onDone }) {
                   </select>
                 </div>
               </Field>
+            </div>
 
-              <Field label="Special Requests / Notes (Optional)" className="sm:col-span-2">
+            {/* Additional Occupants / Co-Guests Section (e.g. 2nd, 3rd guest in room) */}
+            <div className="pt-3 border-t border-slate-200 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <User className="h-4 w-4 text-blue-600" />
+                    Additional Occupants / Co-Guests ({coGuests.length})
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    If multiple customers are staying in this room, enter their Aadhaar / ID details (upload is optional).
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addCoGuest}
+                  className="flex items-center gap-1 rounded-xl bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-2xs"
+                >
+                  <UserPlus className="h-3.5 w-3.5" /> + Add Co-Guest
+                </button>
+              </div>
+
+              {coGuests.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 p-3.5 text-center text-xs text-slate-400 bg-slate-50/50">
+                  Single guest reservation. Click <b>"+ Add Co-Guest"</b> or increase Adults count if multiple customers are staying in this room.
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  {coGuests.map((cg, idx) => (
+                    <div key={idx} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3 shadow-2xs">
+                      <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                        <span className="text-xs font-extrabold text-slate-800 flex items-center gap-2">
+                          <span className="grid h-5 w-5 place-items-center rounded-full bg-blue-600 text-white text-[10px] font-black">
+                            {idx + 2}
+                          </span>
+                          Occupant #{idx + 2} (Aadhaar / ID Details)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeCoGuest(idx)}
+                          className="text-[11px] font-bold text-red-600 hover:text-red-700 hover:underline"
+                        >
+                          ✕ Remove
+                        </button>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Field label={`Occupant #${idx + 2} Full Name`}>
+                          <div className="relative">
+                            <User className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                            <input
+                              className="input pl-9"
+                              placeholder="Enter co-guest full name"
+                              value={cg.name || ''}
+                              onChange={(e) => updateCoGuest(idx, 'name', e.target.value)}
+                            />
+                          </div>
+                        </Field>
+
+                        <Field label="ID Type">
+                          <select
+                            className="input"
+                            value={cg.idType || 'Aadhaar'}
+                            onChange={(e) => updateCoGuest(idx, 'idType', e.target.value)}
+                          >
+                            {['Aadhaar', 'Passport', 'Driving licence', 'Voter ID', 'Other'].map((x) => (
+                              <option key={x}>{x}</option>
+                            ))}
+                          </select>
+                        </Field>
+
+                        <Field label="ID / Aadhaar Number (Optional)" className="sm:col-span-2">
+                          <div className="relative">
+                            <IdCard className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                            <input
+                              className="input pl-9"
+                              placeholder="Enter Aadhaar or ID Number"
+                              value={cg.idNumber || ''}
+                              onChange={(e) => updateCoGuest(idx, 'idNumber', e.target.value)}
+                            />
+                          </div>
+                        </Field>
+
+                        {/* Co-Guest ID Card Document Upload (Optional) */}
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-bold text-slate-700 mb-1">
+                            Aadhaar / ID Document Upload (Optional - Not Mandatory)
+                          </label>
+                          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-white p-3">
+                            {cg.idDocumentUrl ? (
+                              <div className="flex items-center justify-between w-full gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-900">
+                                <span className="flex items-center gap-2 truncate">
+                                  <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+                                  Occupant #{idx + 2} ID Document Attached
+                                </span>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    className="rounded-md bg-white px-2 py-1 text-[11px] font-bold text-emerald-700 border border-emerald-300 hover:bg-emerald-100"
+                                    onClick={() => openDocUrl(cg.idDocumentUrl)}
+                                  >
+                                    View Document
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="rounded-md bg-white px-2 py-1 text-[11px] font-bold text-red-600 border border-red-200 hover:bg-red-50"
+                                    onClick={() => updateCoGuest(idx, 'idDocumentUrl', '')}
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between w-full">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
+                                    <Camera className="h-4 w-4" />
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-bold text-slate-800">Upload Occupant #{idx + 2} Aadhaar / ID Proof</p>
+                                    <p className="text-[10px] text-slate-400">Optional file upload (Image or PDF)</p>
+                                  </div>
+                                </div>
+                                <label className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer shadow-2xs transition">
+                                  {uploadingCoGuestDocs[idx] ? <Spinner /> : <Camera className="h-3.5 w-3.5" />}
+                                  {uploadingCoGuestDocs[idx] ? 'Uploading...' : 'Choose File'}
+                                  <input
+                                    type="file"
+                                    accept="image/*,.pdf"
+                                    className="hidden"
+                                    onChange={(e) => handleCoGuestFileUpload(idx, e)}
+                                    disabled={uploadingCoGuestDocs[idx]}
+                                  />
+                                </label>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Special Requests / Notes */}
+            <div className="pt-2">
+              <Field label="Special Requests / Notes (Optional)">
                 <div className="relative">
                   <FileText className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <textarea className="input pl-9 h-16 py-2 resize-none" placeholder="Any special request, preference or notes..." {...f.register('notes')} />
@@ -329,6 +562,11 @@ function WizardInner({ opts, onClose, onDone }) {
                 <div>
                   <p className="text-xs font-bold text-slate-900">{v.guestName || 'New Guest'}</p>
                   <p className="text-[11px] text-slate-400">{v.phone ? `${v.phonePrefix} ${v.phone}` : 'Guest details will appear here'}</p>
+                  {coGuests.length > 0 && (
+                    <p className="text-[10px] font-bold text-blue-600 mt-1">
+                      + {coGuests.length} Co-Guest{coGuests.length > 1 ? 's' : ''}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -340,10 +578,10 @@ function WizardInner({ opts, onClose, onDone }) {
                 <span className="text-xs font-bold">Quick Tips</span>
               </div>
               <ul className="space-y-1.5 text-[11px] font-medium text-slate-700">
+                <li className="flex items-center gap-1.5 text-emerald-700"><Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> If 3 guests in 1 room, add Aadhaar details for all 3</li>
+                <li className="flex items-center gap-1.5 text-emerald-700"><Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> Aadhaar card upload is optional</li>
                 <li className="flex items-center gap-1.5 text-emerald-700"><Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> Search existing guest to save time</li>
-                <li className="flex items-center gap-1.5 text-emerald-700"><Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> ID proof is required for check-in</li>
-                <li className="flex items-center gap-1.5 text-emerald-700"><Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> You can add special requests later</li>
-                <li className="flex items-center gap-1.5 text-emerald-700"><Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> Guest will be saved to your database</li>
+                <li className="flex items-center gap-1.5 text-emerald-700"><Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> All guest data stored securely</li>
               </ul>
             </div>
 
@@ -380,7 +618,7 @@ function WizardInner({ opts, onClose, onDone }) {
           </Field>
           <p className="rounded-xl border border-blue-100 bg-blue-50/50 p-3.5 text-xs text-blue-900 sm:col-span-2">
             {nights > 0 ? (
-              <>This stay is <b>{nights} night{nights > 1 ? 's' : ''}</b>. The room is held for those nights and is free again on the check-out date.</>
+              <>This stay is <b>{nights} night{nights > 1 ? 's' : ''}</b> for <b>{v.adults || 1} Adult{Number(v.adults) > 1 ? 's' : ''}</b>. The room is held for those nights and is free again on the check-out date.</>
             ) : (
               'Pick the dates to see the number of nights.'
             )}
@@ -513,10 +751,10 @@ function WizardInner({ opts, onClose, onDone }) {
         <div className="space-y-4 text-xs">
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
             {[
-              ['Guest Name', `${v.guestName} (${v.phone})`],
+              ['Primary Guest', `${v.guestName} (${v.phone})`],
               ['Room Selected', `${room?.roomNumber} · ${room?.roomType?.name}`],
               ['Dates', `${v.checkInDate} → ${v.checkOutDate} (${nights} nights)`],
-              ['Occupants', `${v.adults} Adults, ${v.children} Children`],
+              ['Occupants Count', `${v.adults} Adults, ${v.children} Children`],
               ['Total Amount', money(totals.total)],
               ['Paying Now', payMode === 'unpaid' ? 'Unpaid' : money(v.payAmount)],
             ].map(([k, val]) => (
@@ -526,6 +764,46 @@ function WizardInner({ opts, onClose, onDone }) {
               </div>
             ))}
           </dl>
+
+          {/* Occupants / Aadhaar List Summary */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2.5">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Occupants & ID Details ({1 + coGuests.filter((cg) => cg.name || cg.idNumber).length})
+            </h4>
+            <div className="space-y-2">
+              {/* Primary Guest */}
+              <div className="flex items-center justify-between text-xs p-2 rounded-xl bg-slate-50 border border-slate-100">
+                <div>
+                  <span className="font-bold text-slate-900">1. {v.guestName}</span>
+                  <span className="text-slate-500 ml-2">({v.idType || 'Aadhaar'}: {v.idNumber || 'Not entered'})</span>
+                </div>
+                {v.idDocumentUrl ? (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    Doc Uploaded
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-slate-400">No doc upload</span>
+                )}
+              </div>
+
+              {/* Co-Guests */}
+              {coGuests.map((cg, idx) => (
+                <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-xl bg-slate-50 border border-slate-100">
+                  <div>
+                    <span className="font-bold text-slate-900">{idx + 2}. {cg.name || `Occupant #${idx + 2}`}</span>
+                    <span className="text-slate-500 ml-2">({cg.idType || 'Aadhaar'}: {cg.idNumber || 'Not entered'})</span>
+                  </div>
+                  {cg.idDocumentUrl ? (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      Doc Uploaded
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400">No doc upload</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
 
           {v.checkInDate === t && (
             <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer">

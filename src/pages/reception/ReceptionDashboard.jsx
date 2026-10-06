@@ -63,12 +63,12 @@ export default function ReceptionDashboard() {
       </div>
 
       {/* Top Action Buttons Bar */}
-      <div className="flex flex-wrap gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
         {TOP_ACTIONS.map((a) => {
           const btn = (
-            <div className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-extrabold transition-all cursor-pointer ${a.bg}`}>
-              <a.icon className="h-4 w-4" />
-              <span>{a.label}</span>
+            <div className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-extrabold transition-all cursor-pointer min-h-[44px] text-center ${a.bg}`}>
+              <a.icon className="h-4 w-4 shrink-0" />
+              <span className="truncate">{a.label}</span>
             </div>
           );
           return a.link ? <Link key={a.label} to={a.link}>{btn}</Link> : <div key={a.label} onClick={a.onClick}>{btn}</div>;

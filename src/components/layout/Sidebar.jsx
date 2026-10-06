@@ -1,17 +1,18 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ConciergeBell, CalendarRange, BookOpenCheck, LogIn, LogOut, Users, BedDouble, SprayCan, Wrench, CreditCard, FileText, BarChart3, Percent, ShieldCheck, ScrollText, Settings, Hotel, X } from 'lucide-react';
+import { LayoutDashboard, ConciergeBell, CalendarRange, Calendar, BookOpenCheck, LogIn, LogOut, Users, BedDouble, SprayCan, Wrench, CreditCard, FileText, BarChart3, Percent, ShieldCheck, ScrollText, Settings, Hotel, X } from 'lucide-react';
 import { useAuth } from '../../store/auth';
 import { useUI } from '../../store/ui';
 import { cx } from '../common/ui';
 
 const NAV = [
-  { group: 'FRONT DESK', items: [
+  { group: 'CALENDAR & FRONT DESK', items: [
+    { to: '/monthly-calendar', label: 'Monthly Calendar', icon: Calendar, show: (u, c) => c('calendar.view') },
+    { to: '/room-calendar', label: 'Room Calendar', icon: CalendarRange, show: (u, c) => c('calendar.view') },
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, show: (u, c) => c('dashboard.view') },
     { to: '/reception', label: 'Front Desk / New Booking', icon: ConciergeBell, show: (u, c) => c('bookings.create') },
     { to: '/bookings', label: 'All Bookings', icon: BookOpenCheck, show: (u, c) => c('bookings.view') },
     { to: '/check-in', label: 'Check-in', icon: LogIn, show: (u, c) => c('checkin.perform') },
     { to: '/check-out', label: 'Check-out', icon: LogOut, show: (u, c) => c('checkout.perform') },
-    { to: '/calendar', label: 'Room Calendar', icon: CalendarRange, show: (u, c) => c('calendar.view') },
     { to: '/guests', label: 'Guests', icon: Users, show: (u, c) => c('guests.view') },
   ] },
   { group: 'ROOM MANAGEMENT', items: [
@@ -36,6 +37,7 @@ const NAV = [
   ] },
 ];
 
+
 export default function Sidebar() {
   const location = useLocation();
   const user = useAuth((s) => s.user); const can = useAuth((s) => s.can); const { sidebar, toggleSidebar } = useUI();
@@ -48,49 +50,78 @@ export default function Sidebar() {
   };
 
   return <>
-    {sidebar && <div className="fixed inset-0 z-30 bg-slate-900/50 lg:hidden" onClick={() => toggleSidebar(false)} />}
-    <aside className={cx('fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-[#0F172A] text-slate-300 transition-transform lg:static lg:translate-x-0', sidebar ? 'translate-x-0' : '-translate-x-full')}>
-      <div className="flex h-16 items-center justify-between border-b border-slate-800/60 px-5">
+    {sidebar && (
+      <div
+        className="fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-xs lg:hidden transition-opacity"
+        onClick={() => toggleSidebar(false)}
+        aria-hidden="true"
+      />
+    )}
+    <aside
+      className={cx(
+        'fixed inset-y-0 left-0 z-50 flex w-[84vw] max-w-[280px] sm:w-72 lg:w-64 flex-col bg-[#0F172A] text-slate-300 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 shadow-2xl lg:shadow-none',
+        sidebar ? 'translate-x-0' : '-translate-x-full'
+      )}
+    >
+      <div className="flex h-16 items-center justify-between border-b border-slate-800/60 px-4 sm:px-5 shrink-0">
         <div className="flex items-center gap-3 text-white">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20"><Hotel className="h-5 w-5" /></span>
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+            <Hotel className="h-5 w-5" />
+          </span>
           <div>
             <span className="block text-base font-extrabold leading-none tracking-tight">Hotel Bliss</span>
             <span className="mt-0.5 block text-[10px] font-medium text-slate-400">Property Management System</span>
           </div>
         </div>
-        <button className="lg:hidden text-slate-400 hover:text-white" onClick={() => toggleSidebar(false)} aria-label="Close menu"><X className="h-5 w-5" /></button>
+        <button
+          className="grid h-10 w-10 place-items-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/60 active:scale-95 lg:hidden"
+          onClick={() => toggleSidebar(false)}
+          aria-label="Close menu"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3.5 pb-6 pt-4" aria-label="Main">
-        {groups.map((g) => <div key={g.group}>
-          <p className="mb-2 px-3 text-[10px] font-bold tracking-wider text-slate-400 uppercase">{g.group}</p>
-          <div className="space-y-1">
-            {g.items.map((i) => {
-              const active = isNavItemActive(i.to);
-              return (
-                <NavLink
-                  key={i.to}
-                  to={i.to}
-                  onClick={() => toggleSidebar(false)}
-                  className={cx('flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-all', active ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30' : 'text-slate-300 hover:bg-slate-800/60 hover:text-white')}
-                >
-                  <i.icon className="h-4 w-4 shrink-0" />
-                  {i.label}
-                </NavLink>
-              );
-            })}
+
+      <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-6 pt-4 custom-scrollbar" aria-label="Main">
+        {groups.map((g) => (
+          <div key={g.group}>
+            <p className="mb-2 px-3 text-[10px] font-bold tracking-wider text-slate-400 uppercase">{g.group}</p>
+            <div className="space-y-1">
+              {g.items.map((i) => {
+                const active = isNavItemActive(i.to);
+                return (
+                  <NavLink
+                    key={i.to}
+                    to={i.to}
+                    onClick={() => toggleSidebar(false)}
+                    className={cx(
+                      'flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all min-h-[44px] active:scale-[0.98]',
+                      active
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                        : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                    )}
+                  >
+                    <i.icon className="h-4.5 w-4.5 shrink-0" />
+                    <span>{i.label}</span>
+                  </NavLink>
+                );
+              })}
+            </div>
           </div>
-        </div>)}
+        ))}
       </nav>
-      <div className="p-3.5 border-t border-slate-800/60">
+
+      <div className="p-3.5 border-t border-slate-800/60 shrink-0 pb-safe">
         <div className="rounded-xl bg-slate-800/40 border border-slate-700/50 p-3 text-xs text-slate-300 flex items-center gap-3">
           <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
             <Hotel className="h-4 w-4" />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="font-bold text-slate-200 text-xs">Need Help?</p>
-            <p className="text-[11px] text-slate-400">Contact support</p>
+            <p className="text-[11px] text-slate-400 truncate">Contact support</p>
           </div>
         </div>
       </div>
-    </aside></>;
+    </aside>
+  </>;
 }

@@ -58,6 +58,8 @@ export default function BookingsPage() {
           </select>
         </div>
         <QueryBoundary q={q} isEmpty={!q.data?.items.length} empty={<EmptyState title="No bookings found" message="Change the filters or create a new booking." />}>
+        {/* Desktop Table View */}
+        <div className="hidden md:block">
           <DataTable
             rows={q.data?.items || []}
             onRowClick={(b) => open(b._id)}
@@ -126,9 +128,61 @@ export default function BookingsPage() {
               },
             ]}
           />
-          <Pager page={page} total={q.data?.total || 0} limit={20} onPage={setPage} />
-        </QueryBoundary>
-      </Card>
+        </div>
+
+        {/* Mobile Card List View (< md) */}
+        <div className="divide-y divide-slate-100 md:hidden">
+          {(q.data?.items || []).map((b) => (
+            <div
+              key={b._id}
+              onClick={() => open(b._id)}
+              className="p-4 active:bg-slate-50 transition-colors space-y-2.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-black text-sm text-slate-900">{b.guest?.name || 'Guest'}</p>
+                  <p className="text-xs font-bold text-blue-600">{b.bookingNumber}</p>
+                </div>
+                <Badge status={b.bookingStatus} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Room</span>
+                  <span className="font-bold text-slate-900">Room {b.room?.roomNumber || '—'}</span>
+                  <span className="text-[11px] text-slate-500 block truncate">{b.roomType?.name}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Dates</span>
+                  <span className="font-bold text-slate-900">{fmtDate(b.checkInDate, 'dd MMM')} → {fmtDate(b.checkOutDate, 'dd MMM')}</span>
+                  <span className="text-[11px] text-slate-500 block">({b.nights} nights)</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1 text-xs">
+                <div>
+                  <span className="font-black text-slate-900 text-sm">{money(b.totalAmount)}</span>
+                  {b.balanceAmount > 0 && (
+                    <span className="block text-[11px] font-bold text-red-600">{money(b.balanceAmount)} balance</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge status={b.paymentStatus} />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); open(b._id); }}
+                    className="btn-ghost btn-sm text-xs font-bold px-3 py-1.5"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Pager page={page} total={q.data?.total || 0} limit={20} onPage={setPage} />
+      </QueryBoundary>
+    </Card>
     </>
   );
 }

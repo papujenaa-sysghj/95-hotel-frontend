@@ -6,7 +6,8 @@ import LoginPage from './pages/auth/LoginPage';
 import { ForgotPage, ResetPage } from './pages/auth/ForgotResetPages';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ReceptionDashboard from './pages/reception/ReceptionDashboard';
-import CalendarPage from './pages/calendar/CalendarPage';
+import RoomCalendarPage from './pages/room-calendar/RoomCalendarPage';
+import MonthlyCalendarPage from './pages/monthly-calendar/MonthlyCalendarPage';
 import BookingsPage from './pages/bookings/BookingsPage';
 import CheckInPage from './pages/bookings/CheckInPage';
 import CheckOutPage from './pages/bookings/CheckOutPage';
@@ -33,7 +34,11 @@ export default function App() {
         <Route index element={<Navigate to={homeFor(user)} replace />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route element={<ProtectedRoute perm="dashboard.view" />}><Route path="dashboard" element={<AdminDashboard />} /><Route path="reception" element={<ReceptionDashboard />} /></Route>
-        <Route element={<ProtectedRoute perm="calendar.view" />}><Route path="calendar" element={<CalendarPage />} /></Route>
+        <Route element={<ProtectedRoute perm="calendar.view" />}>
+          <Route path="room-calendar" element={<RoomCalendarPage />} />
+          <Route path="calendar" element={<RoomCalendarPage />} />
+          <Route path="monthly-calendar" element={<MonthlyCalendarPage />} />
+        </Route>
         <Route element={<ProtectedRoute perm="bookings.view" />}><Route path="bookings" element={<BookingsPage />} /></Route>
         <Route element={<ProtectedRoute perm="checkin.perform" />}><Route path="check-in" element={<CheckInPage />} /></Route>
         <Route element={<ProtectedRoute perm="checkout.perform" />}><Route path="check-out" element={<CheckOutPage />} /></Route>

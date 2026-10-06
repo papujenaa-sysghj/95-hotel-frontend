@@ -80,14 +80,8 @@ export default function BookingDrawer() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/80">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Checked-in
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 border border-amber-200/80">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                  Pending
-                </span>
+                <Badge status={b.bookingStatus} />
+                <Badge status={b.paymentStatus} />
               </div>
             </div>
 
@@ -95,49 +89,90 @@ export default function BookingDrawer() {
             <div className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 shadow-2xs">
               <div className="flex items-center gap-3.5">
                 <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-100 text-blue-700 font-black text-sm">
-                  {b.guest?.name ? b.guest.name.split(' ').map((n) => n[0]).slice(0, 2).join('') : 'VS'}
+                  {b.guest?.name ? b.guest.name.split(' ').map((n) => n[0]).slice(0, 2).join('') : 'G'}
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-900 leading-tight">{b.guest?.name || 'Vikram Singh'}</h3>
+                  <h3 className="text-base font-extrabold text-slate-900 leading-tight">{b.guest?.name || 'Guest'}</h3>
                   <div className="mt-1 flex flex-wrap gap-x-3 text-xs font-semibold text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <Phone className="h-3 w-3 text-slate-400" />
-                      {b.guest?.phone || '+91 98765 43210'}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Mail className="h-3 w-3 text-slate-400" />
-                      {b.guest?.email || 'vikram@example.com'}
-                    </span>
+                    {b.guest?.phone && (
+                      <span className="flex items-center gap-1">
+                        <Phone className="h-3 w-3 text-slate-400" />
+                        {b.guest.phone}
+                      </span>
+                    )}
+                    {b.guest?.email && (
+                      <span className="flex items-center gap-1">
+                        <Mail className="h-3 w-3 text-slate-400" />
+                        {b.guest.email}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Aadhaar / ID Proof Document Info Card */}
-            {b.guest?.idDocumentUrl ? (
-              <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3.5 shadow-2xs">
-                <div className="flex items-center gap-3">
-                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-100 text-emerald-700">
-                    <FileText className="h-5 w-5" />
+            {/* Primary Guest & Co-Guests Aadhaar / ID Proof Documents */}
+            <div className="space-y-2.5">
+              {/* Primary Guest Document */}
+              {b.guest?.idDocumentUrl ? (
+                <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3.5 shadow-2xs">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-100 text-emerald-700">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-emerald-900">{b.guest?.name} ({b.guest?.idType || 'Aadhaar Card'})</p>
+                      <p className="text-[11px] font-semibold text-emerald-700">{b.guest?.idNumber ? `ID Number: ${b.guest.idNumber}` : 'Guest ID Proof Document'}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-emerald-900">{b.guest?.idType || 'Aadhaar Card'} Document Attached</p>
-                    <p className="text-[11px] font-semibold text-emerald-700">{b.guest?.idNumber ? `ID Number: ${b.guest.idNumber}` : 'Guest ID Proof Document'}</p>
-                  </div>
+                  <button
+                    onClick={() => openDocUrl(b.guest.idDocumentUrl)}
+                    className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-extrabold text-white hover:bg-emerald-700 shadow-2xs transition-colors"
+                  >
+                    <Eye className="h-3.5 w-3.5" /> View ID Card
+                  </button>
                 </div>
-                <button
-                  onClick={() => openDocUrl(b.guest.idDocumentUrl)}
-                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-extrabold text-white hover:bg-emerald-700 shadow-2xs transition-colors"
-                >
-                  <Eye className="h-3.5 w-3.5" /> View Aadhaar / ID Card
-                </button>
-              </div>
-            ) : b.guest?.idNumber ? (
-              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/70 p-3 px-4 text-xs font-semibold text-slate-700">
-                <span><b>{b.guest.idType || 'ID Proof'}:</b> {b.guest.idNumber}</span>
-                <span className="text-[11px] text-slate-400 italic">No document file attached</span>
-              </div>
-            ) : null}
+              ) : b.guest?.idNumber ? (
+                <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/70 p-3 px-4 text-xs font-semibold text-slate-700">
+                  <span><b>{b.guest?.name} ({b.guest.idType || 'Aadhaar'}):</b> {b.guest.idNumber}</span>
+                  <span className="text-[11px] text-slate-400 italic">No document file attached</span>
+                </div>
+              ) : null}
+
+              {/* Co-Guests Documents */}
+              {b.coGuests && b.coGuests.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 px-1">
+                    Co-Guests & Additional Occupants ({b.coGuests.length})
+                  </p>
+                  {b.coGuests.map((cg, idx) => (
+                    <div key={idx} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-2xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-700 font-bold text-xs">
+                          {idx + 2}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">{cg.name || `Occupant #${idx + 2}`}</p>
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            {cg.idType || 'Aadhaar'}: {cg.idNumber || 'No ID number'}
+                          </p>
+                        </div>
+                      </div>
+                      {cg.idDocumentUrl ? (
+                        <button
+                          onClick={() => openDocUrl(cg.idDocumentUrl)}
+                          className="flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-300 px-2.5 py-1 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+                        >
+                          <Eye className="h-3.5 w-3.5 text-emerald-600" /> View ID
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 italic">No file</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* 4 Tile Grid: Room, Check-in, Check-out, Duration */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -145,8 +180,8 @@ export default function BookingDrawer() {
                 <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
                   <BedDouble className="h-3.5 w-3.5 text-blue-600" /> Room
                 </div>
-                <p className="mt-1.5 text-sm font-black text-slate-900">{b.room?.roomNumber || '107'} · Floor {b.room?.floor || 1}</p>
-                <p className="text-[11px] font-bold text-blue-600">{b.roomType?.name || 'Deluxe (AC)'}</p>
+                <p className="mt-1.5 text-sm font-black text-slate-900">{b.room?.roomNumber ? `Room ${b.room.roomNumber}` : 'Unassigned'} {b.room?.floor !== undefined ? `· Fl ${b.room.floor}` : ''}</p>
+                <p className="text-[11px] font-bold text-blue-600">{b.roomType?.name || 'Standard'}</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-3">
@@ -154,7 +189,7 @@ export default function BookingDrawer() {
                   <Calendar className="h-3.5 w-3.5 text-blue-600" /> Check-in
                 </div>
                 <p className="mt-1.5 text-sm font-black text-slate-900">{fmtDate(b.checkInDate, 'dd MMM yyyy')}</p>
-                <p className="text-[11px] font-semibold text-slate-400">2:16 PM</p>
+                <p className="text-[11px] font-semibold text-slate-400">12:00 PM</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-3">
@@ -162,15 +197,15 @@ export default function BookingDrawer() {
                   <Calendar className="h-3.5 w-3.5 text-blue-600" /> Check-out
                 </div>
                 <p className="mt-1.5 text-sm font-black text-slate-900">{fmtDate(b.checkOutDate, 'dd MMM yyyy')}</p>
-                <p className="text-[11px] font-semibold text-slate-400">2:16 PM</p>
+                <p className="text-[11px] font-semibold text-slate-400">11:00 AM</p>
               </div>
 
               <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-3">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
                   <Moon className="h-3.5 w-3.5 text-blue-600" /> Duration
                 </div>
-                <p className="mt-1.5 text-sm font-black text-slate-900">{b.nights || 3} Nights</p>
-                <p className="text-[11px] font-semibold text-slate-500">{b.adults || 2} Adults, {b.children || 0} Children</p>
+                <p className="mt-1.5 text-sm font-black text-slate-900">{b.nights || 1} Night{b.nights > 1 ? 's' : ''}</p>
+                <p className="text-[11px] font-semibold text-slate-500">{b.adults || 1} Adult{b.adults > 1 ? 's' : ''}{b.children ? `, ${b.children} Child` : ''}</p>
               </div>
             </div>
 
@@ -227,7 +262,7 @@ export default function BookingDrawer() {
                     <p className="text-[11px] font-semibold text-rose-500">Paid Amount: {money(b.paidAmount || 0)}</p>
                   </div>
                 </div>
-                <span className="text-lg font-black text-rose-600">{money(b.balanceAmount || 10080)}</span>
+                <span className="text-lg font-black text-rose-600">{money(b.balanceAmount || 0)}</span>
               </div>
             </div>
 
@@ -239,15 +274,15 @@ export default function BookingDrawer() {
               </div>
               <div>
                 <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Created by</p>
-                <p className="font-bold text-slate-800 mt-0.5">{b.createdBy?.name || 'Riya Sharma'}</p>
+                <p className="font-bold text-slate-800 mt-0.5">{b.createdBy?.name || 'Staff'}</p>
               </div>
               <div>
                 <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Created</p>
-                <p className="font-bold text-slate-800 mt-0.5">{fmtDateTime(b.createdAt) || '20 Sep 2026, 2:16 PM'}</p>
+                <p className="font-bold text-slate-800 mt-0.5">{fmtDateTime(b.createdAt) || '—'}</p>
               </div>
               <div>
                 <p className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Notes</p>
-                <p className="font-bold text-slate-800 mt-0.5">{b.notes || 'DEMO Booking'}</p>
+                <p className="font-bold text-slate-800 mt-0.5">{b.notes || 'None'}</p>
               </div>
             </div>
 
@@ -520,9 +555,8 @@ function RoomModal({ open, b, onClose, inv }) {
             <button
               key={r._id}
               onClick={() => setSel(r._id)}
-              className={`rounded-xl border p-3 text-left text-sm ${
-                sel === r._id ? 'border-brand-600 bg-brand-50' : 'border-slate-200'
-              }`}
+              className={`rounded-xl border p-3 text-left text-sm ${sel === r._id ? 'border-brand-600 bg-brand-50' : 'border-slate-200'
+                }`}
             >
               <b>Room {r.roomNumber}</b> · {r.roomType?.name}
               <br />
