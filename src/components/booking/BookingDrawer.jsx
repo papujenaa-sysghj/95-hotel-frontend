@@ -500,16 +500,42 @@ function EditModal({ open, b, onClose, inv }) {
 }
 
 function ExtendModal({ open, b, onClose, inv }) {
-  const [out, setOut] = useState('');
-  const val = out || iso(utcDate(b.checkOutDate));
-  const m = useMutate((d) => bookingApi.extend(b._id, { checkOutDate: d }), {
+  const [inDate, setInDate] = useState('');
+  const [outDate, setOutDate] = useState('');
+
+  useEffect(() => {
+    if (open && b) {
+      setInDate(iso(utcDate(b.checkInDate)));
+      setOutDate(iso(utcDate(b.checkOutDate)));
+    }
+  }, [open, b]);
+
+  const isCheckedIn = b?.bookingStatus === 'checked_in';
+  const currentIn = inDate || (b ? iso(utcDate(b.checkInDate)) : '');
+  const currentOut = outDate || (b ? iso(utcDate(b.checkOutDate)) : '');
+
+  const inD = currentIn ? new Date(currentIn + 'T00:00:00Z') : null;
+  const outD = currentOut ? new Date(currentOut + 'T00:00:00Z') : null;
+  const diffNights = inD && outD ? Math.round((outD - inD) / 86400000) : 0;
+  const isValid = diffNights >= 1;
+
+  const m = useMutate((body) => bookingApi.extend(b._id, body), {
     success: 'Stay updated. Charges recalculated.',
     invalidate: inv,
     onSuccess: () => {
-      setOut('');
+      setInDate('');
+      setOutDate('');
       onClose();
     },
   });
+
+  const handleSave = () => {
+    if (!isValid) return;
+    m.mutate({
+      checkInDate: currentIn,
+      checkOutDate: currentOut,
+    });
+  };
 
   return (
     <Modal
@@ -522,25 +548,64 @@ function ExtendModal({ open, b, onClose, inv }) {
           <button className="btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn-primary" disabled={m.isPending} onClick={() => m.mutate(val)}>
+          <button className="btn-primary" disabled={!isValid || m.isPending} onClick={handleSave}>
             {m.isPending && <Spinner />}Save new dates
           </button>
         </>
       }
     >
-      <p className="mb-3 text-sm text-slate-500">
-        Currently {fmtDate(b.checkInDate, 'dd MMM')} → {fmtDate(b.checkOutDate, 'dd MMM')}. The server checks the room is free before
-        saving.
-      </p>
-      <Field label="New check-out date">
-        <input
-          type="date"
-          className="input"
-          min={iso(addDays(utcDate(b.checkInDate), 1))}
-          value={val}
-          onChange={(e) => setOut(e.target.value)}
-        />
-      </Field>
+      <div className="space-y-3.5">
+        <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-xs text-blue-900">
+          <p className="font-bold text-blue-950 mb-0.5">Current Reservation Range</p>
+          <p>
+            {fmtDate(b.checkInDate, 'dd MMM yyyy')} → {fmtDate(b.checkOutDate, 'dd MMM yyyy')}{' '}
+            <span className="font-semibold text-blue-700">({b.nights} {b.nights === 1 ? 'night' : 'nights'})</span>
+          </p>
+        </div>
+
+        <Field
+          label="New check-in date"
+          hint={
+            isCheckedIn
+              ? 'Guest is already checked in. Check-in date cannot be changed.'
+              : 'Adjust if client wants to come earlier or change arrival date.'
+          }
+        >
+          <input
+            type="date"
+            className="input"
+            disabled={isCheckedIn}
+            value={currentIn}
+            max={currentOut ? iso(addDays(utcDate(currentOut), -1)) : undefined}
+            onChange={(e) => setInDate(e.target.value)}
+          />
+        </Field>
+
+        <Field label="New check-out date">
+          <input
+            type="date"
+            className="input"
+            min={currentIn ? iso(addDays(utcDate(currentIn), 1)) : undefined}
+            value={currentOut}
+            onChange={(e) => setOutDate(e.target.value)}
+          />
+        </Field>
+
+        {isValid ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-800">
+            <p className="font-bold text-emerald-900">
+              New Duration: {diffNights} {diffNights === 1 ? 'night' : 'nights'}
+            </p>
+            <p className="mt-0.5 text-emerald-700 text-[11px]">
+              {fmtDate(currentIn, 'dd MMM yyyy')} → {fmtDate(currentOut, 'dd MMM yyyy')} · Room availability is checked before saving.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs font-semibold text-rose-700">
+            Check-out date must be at least 1 day after check-in date.
+          </div>
+        )}
+      </div>
     </Modal>
   );
 }
