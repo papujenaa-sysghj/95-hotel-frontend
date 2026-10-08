@@ -530,10 +530,10 @@ export default function MonthlyCalendarContent({
                       </span>
 
                       <div className="text-right leading-tight">
-                        <span className="text-[9px] sm:text-[11px] font-black text-slate-800">
+                        <span className="text-[9px] sm:text-[11px] font-black text-slate-900 block">
                           {d.occupancyPercentage}%
                         </span>
-                        <span className="text-[8px] sm:text-[9px] font-semibold text-slate-400 hidden lg:block">
+                        <span className="text-[8px] sm:text-[9px] font-bold text-slate-500 block">
                           {d.occupiedCount}/{d.totalRooms}
                         </span>
                       </div>
@@ -548,13 +548,13 @@ export default function MonthlyCalendarContent({
                     </div>
                   </div>
 
-                  {/* Middle: Free count (shown on tablet/desktop) */}
-                  <div className="hidden sm:flex items-center justify-between text-[9px] font-semibold text-slate-500 my-0.5">
-                    <span className="text-slate-600 truncate">
-                      <span className="text-emerald-600 font-bold">{availableCount}</span> free
+                  {/* Middle: Total & Free count summary (Always visible on mobile & desktop) */}
+                  <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-bold my-0.5">
+                    <span className="text-emerald-700 bg-emerald-50/90 px-1 py-0.2 rounded border border-emerald-200/70 truncate">
+                      {availableCount} free
                     </span>
                     {d.dailyEstRevenue > 0 && (
-                      <span className="text-slate-400 hidden xl:inline">
+                      <span className="text-slate-400 font-medium hidden sm:inline">
                         ₹{(d.dailyEstRevenue / 1000).toFixed(1)}k
                       </span>
                     )}
