@@ -119,7 +119,7 @@ function WizardInner({ opts, onClose, onDone }) {
   const defaultHotelTax = Number(hotelSettings?.hotel?.booking?.taxPercent ?? 12);
   const [customTaxRate, setCustomTaxRate] = useState(null);
   const taxRate = customTaxRate !== null ? customTaxRate : defaultHotelTax;
-  const [applyTax, setApplyTax] = useState(true);
+  const [applyTax, setApplyTax] = useState(false);
   const activeTaxPercent = applyTax ? (Number(taxRate) || 0) : 0;
   const totals = useMemo(() => calcTotals({ ...v, roomRate: Number(v.roomRate), nights, taxPercent: activeTaxPercent, discount: Number(v.discount) }), [v.roomRate, v.extraBedCharge, v.otherCharges, v.discount, nights, activeTaxPercent]);
 

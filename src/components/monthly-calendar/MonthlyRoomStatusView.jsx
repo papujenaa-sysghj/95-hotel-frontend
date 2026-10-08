@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { BedDouble, Search, Plus } from 'lucide-react';
-import { STATUS } from '../../utils/format';
+import { STATUS, iso, today, addDays } from '../../utils/format';
+import { useUI } from '../../store/ui';
 import { cx } from '../common/ui';
 import AddRoomModal from './AddRoomModal';
 
@@ -8,6 +9,7 @@ export default function MonthlyRoomStatusView({
   calendarData,
   onOpenBooking
 }) {
+  const openWizard = useUI((s) => s.openWizard);
   const [filterFloor, setFilterFloor] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [search, setSearch] = useState('');
@@ -204,7 +206,7 @@ export default function MonthlyRoomStatusView({
                       {STATUS[room.status]?.label || room.status}
                     </span>
 
-                    {activeBooking && (
+                    {activeBooking ? (
                       <button
                         onClick={() => onOpenBooking(activeBooking._id)}
                         className="text-[10px] font-bold text-blue-600 hover:underline truncate max-w-[80px]"
@@ -212,7 +214,14 @@ export default function MonthlyRoomStatusView({
                       >
                         {activeBooking.guest?.name || 'Guest'}
                       </button>
-                    )}
+                    ) : room.status === 'available' ? (
+                      <button
+                        onClick={() => openWizard({ roomId: room._id, checkIn: iso(today()), checkOut: iso(addDays(today(), 1)) })}
+                        className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 px-2 py-0.5 rounded-lg border border-emerald-200 transition-all"
+                      >
+                        + Book
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               );

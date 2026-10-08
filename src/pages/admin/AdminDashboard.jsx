@@ -291,7 +291,7 @@ export default function AdminDashboard() {
             pad
           >
             <QueryBoundary q={q} skeleton={<Skeleton className="h-64" />}>
-              <RoomStatusGrid rooms={q.data?.roomGrid || []} />
+              <RoomStatusGrid rooms={q.data?.roomGrid || []} date={statusDate} />
               <RoomLegend />
             </QueryBoundary>
           </Card>

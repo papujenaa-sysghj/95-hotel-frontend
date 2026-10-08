@@ -470,12 +470,12 @@ function EditModal({ open, b, onClose, inv }) {
   });
   const defaultHotelTax = Number(hotelSettings?.hotel?.booking?.taxPercent ?? 12);
 
-  const [applyTax, setApplyTax] = useState(true);
+  const [applyTax, setApplyTax] = useState(false);
 
   useEffect(() => {
     if (open && b) {
       setTab('guest');
-      const bTax = b.taxPercent !== undefined && b.taxPercent !== null ? Number(b.taxPercent) : defaultHotelTax;
+      const bTax = b.taxPercent !== undefined && b.taxPercent !== null ? Number(b.taxPercent) : 0;
       const hasTax = bTax > 0;
       setApplyTax(hasTax);
       setForm({

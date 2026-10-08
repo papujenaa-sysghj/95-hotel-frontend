@@ -1,20 +1,21 @@
 import { Link } from 'react-router-dom';
 import { BedDouble, DoorOpen, DoorClosed, Wrench, Ban, UserCheck, UserPlus, LogIn, LogOut, CreditCard, Printer, Percent, CheckCircle2, ChevronRight, Plane } from 'lucide-react';
 import { Card, Badge, EmptyState, Skeleton, DataTable, cx } from '../common/ui';
-import { fmtDate, fmtDateTime, money, STATUS, humanize, timeAgo } from '../../utils/format';
+import { fmtDate, fmtDateTime, money, STATUS, humanize, timeAgo, iso, today, addDays } from '../../utils/format';
 import { useUI } from '../../store/ui';
 
 export const ROOM_STYLES = {
-  available: 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100/70',
-  occupied: 'bg-red-50 border-red-200 text-red-800 hover:bg-red-100/70',
+  available: 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100/70 cursor-pointer',
+  occupied: 'bg-red-50 border-red-200 text-red-800 hover:bg-red-100/70 cursor-pointer',
   cleaning: 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100/70',
   maintenance: 'bg-orange-50 border-orange-200 text-orange-800 hover:bg-orange-100/70',
   out_of_service: 'bg-rose-50/70 border-rose-300 text-rose-800 hover:bg-rose-100/70',
   temp_non_ac: 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100/70',
 };
 
-export function RoomStatusGrid({ rooms, loading }) {
+export function RoomStatusGrid({ rooms, loading, date }) {
   const openBooking = useUI((s) => s.openBooking);
+  const openWizard = useUI((s) => s.openWizard);
   if (loading) return <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>;
 
   // Group rooms by floor (1 to 5)
@@ -25,6 +26,19 @@ export function RoomStatusGrid({ rooms, loading }) {
   });
 
   const floors = [1, 2, 3, 4, 5];
+
+  const handleRoomClick = (r) => {
+    if (r.currentBookingId) {
+      openBooking(r.currentBookingId);
+    } else if (r.status === 'available') {
+      const selectedDate = date || iso(today());
+      openWizard({
+        roomId: r._id,
+        checkIn: selectedDate,
+        checkOut: iso(addDays(new Date(selectedDate), 1))
+      });
+    }
+  };
 
   return (
     <div className="space-y-3.5">
@@ -38,12 +52,23 @@ export function RoomStatusGrid({ rooms, loading }) {
               {floorRooms.map((r) => {
                 const styleKey = r.isTemporary ? 'temp_non_ac' : r.status;
                 const styleClass = ROOM_STYLES[styleKey] || 'bg-slate-50 border-slate-200 text-slate-700';
+                const isClickable = !!(r.currentBookingId || r.status === 'available');
                 return (
                   <button
                     key={r._id}
-                    onClick={() => r.currentBookingId && openBooking(r.currentBookingId)}
-                    title={`Room ${r.roomNumber} · ${r.isTemporary ? 'Non-AC (Temporary)' : STATUS[r.status]?.label}`}
-                    className={cx('flex flex-col items-center justify-center rounded-xl border p-2 transition-all hover:scale-102 hover:shadow-xs', styleClass)}
+                    onClick={() => handleRoomClick(r)}
+                    title={
+                      r.currentBookingId
+                        ? `Room ${r.roomNumber} (Occupied) • Click to view booking`
+                        : r.status === 'available'
+                        ? `Room ${r.roomNumber} (Available) • Click to create booking`
+                        : `Room ${r.roomNumber} · ${r.isTemporary ? 'Non-AC (Temporary)' : STATUS[r.status]?.label}`
+                    }
+                    className={cx(
+                      'flex flex-col items-center justify-center rounded-xl border p-2 transition-all hover:scale-105 hover:shadow-xs active:scale-95',
+                      styleClass,
+                      !isClickable && 'cursor-default'
+                    )}
                   >
                     <span className="text-xs font-extrabold tracking-tight">{r.roomNumber}</span>
                     <span className="mt-0.5 truncate text-[10px] font-semibold opacity-90">
