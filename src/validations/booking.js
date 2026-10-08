@@ -16,7 +16,7 @@ export const stayStep = z.object({
   adults: z.coerce.number().int().min(1, 'At least 1 adult'), children: z.coerce.number().int().min(0),
 }).refine((d) => d.checkOutDate > d.checkInDate, { message: 'Check-out date must be after check-in date.', path: ['checkOutDate'] });
 export const pricingStep = z.object({
-  roomRate: z.coerce.number().min(0), extraBedCharge: z.coerce.number().min(0), otherCharges: z.coerce.number().min(0), discount: z.coerce.number().min(0),
+  roomRate: z.coerce.number().min(0), extraBedCharge: z.coerce.number().min(0), otherCharges: z.coerce.number().min(0), discount: z.coerce.number().min(0), taxPercent: z.coerce.number().min(0).max(100).optional(),
 });
 export const calcTotals = ({ roomRate = 0, nights = 0, extraBedCharge = 0, otherCharges = 0, discount = 0, taxPercent = 0 }) => {
   const subtotal = roomRate * nights + Number(extraBedCharge) + Number(otherCharges); const taxable = Math.max(0, subtotal - discount);

@@ -117,7 +117,7 @@ export default function MonthlyCalendarPage() {
       />
 
       {/* Main Monthly Calendar Content Area */}
-      <main className={`flex-1 p-2 sm:p-3 lg:p-4 bg-slate-50/50 flex flex-col h-full min-h-0 w-full ${activeView === 'calendar' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+      <main className={`flex-1 p-2 sm:p-3 lg:p-4 bg-slate-50/50 flex flex-col h-full min-h-0 w-full overflow-y-auto lg:overflow-hidden`}>
         {isLoading ? (
           <div className="p-6 space-y-4">
             <Skeleton className="h-10 w-64 rounded-xl" />

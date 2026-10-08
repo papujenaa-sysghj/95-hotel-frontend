@@ -464,12 +464,19 @@ function EditModal({ open, b, onClose, inv }) {
     notes: '',
   });
 
+  const { data: hotelSettings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => unwrap(api.get('/settings'))
+  });
+  const defaultHotelTax = Number(hotelSettings?.hotel?.booking?.taxPercent ?? 12);
+
   const [applyTax, setApplyTax] = useState(true);
 
   useEffect(() => {
     if (open && b) {
       setTab('guest');
-      const hasTax = (b.taxPercent ?? 12) > 0;
+      const bTax = b.taxPercent !== undefined && b.taxPercent !== null ? Number(b.taxPercent) : defaultHotelTax;
+      const hasTax = bTax > 0;
       setApplyTax(hasTax);
       setForm({
         name: b.guest?.name || '',
@@ -494,12 +501,12 @@ function EditModal({ open, b, onClose, inv }) {
         extraBedCharge: b.extraBedCharge ?? 0,
         otherCharges: b.otherCharges ?? 0,
         discount: b.discount ?? 0,
-        taxPercent: b.taxPercent ?? 12,
+        taxPercent: hasTax ? bTax : (defaultHotelTax || 12),
         source: b.source || 'reception',
         notes: b.notes || '',
       });
     }
-  }, [open, b]);
+  }, [open, b, defaultHotelTax]);
 
   const setField = (k) => (e) => setForm((prev) => ({ ...prev, [k]: e.target.value }));
 
@@ -976,32 +983,73 @@ function EditModal({ open, b, onClose, inv }) {
               </Field>
             </div>
 
-            {/* Optional 12% Tax Toggle */}
-            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/90 p-3.5 shadow-2xs">
-              <label htmlFor="editApplyTaxToggle" className="flex items-center gap-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  id="editApplyTaxToggle"
-                  checked={applyTax}
-                  onChange={(e) => setApplyTax(e.target.checked)}
-                  className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <div>
-                  <p className="text-xs font-bold text-slate-900">Apply 12% GST / Tax (Optional)</p>
-                  <p className="text-[11px] text-slate-500">Tick to calculate 12% tax, or untick to make stay tax-free (0%).</p>
+            {/* Dynamic & Optional Tax Toggle */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-4 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="editApplyTaxToggle" className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    id="editApplyTaxToggle"
+                    checked={applyTax}
+                    onChange={(e) => setApplyTax(e.target.checked)}
+                    className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">
+                      Apply {applyTax ? `${Number(form.taxPercent) || 0}%` : ''} GST / Tax (Optional)
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Tick to calculate tax dynamically, or untick to make stay tax-free (0%).
+                    </p>
+                  </div>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setApplyTax(!applyTax)}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all ${
+                    applyTax
+                      ? 'bg-blue-50 border-blue-200 text-blue-700'
+                      : 'bg-slate-100 border-slate-200 text-slate-500'
+                  }`}
+                >
+                  {applyTax ? `✓ ${Number(form.taxPercent) || 0}% Tax Active` : '✕ No Tax (0%)'}
+                </button>
+              </div>
+
+              {applyTax && (
+                <div className="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-600">Tax Rate (%):</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="any"
+                      value={form.taxPercent}
+                      onChange={(e) => setForm((prev) => ({ ...prev, taxPercent: e.target.value }))}
+                      className="input w-24 py-1 px-2.5 text-xs font-bold text-slate-900 bg-white"
+                    />
+                    <span className="text-[11px] text-slate-400">Hotel default: {defaultHotelTax}%</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-medium text-slate-400">Quick rate:</span>
+                    {[0, 5, 12, 18, 28].map((rate) => (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => setForm((prev) => ({ ...prev, taxPercent: rate }))}
+                        className={`px-2 py-0.5 text-[11px] font-bold rounded-lg border transition-all ${
+                          Number(form.taxPercent) === rate
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {rate}%
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </label>
-              <button
-                type="button"
-                onClick={() => setApplyTax(!applyTax)}
-                className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all ${
-                  applyTax
-                    ? 'bg-blue-50 border-blue-200 text-blue-700'
-                    : 'bg-slate-100 border-slate-200 text-slate-500'
-                }`}
-              >
-                {applyTax ? '✓ 12% Tax Active' : '✕ No Tax (0%)'}
-              </button>
+              )}
             </div>
 
             {/* Live Financial Breakdown Card */}

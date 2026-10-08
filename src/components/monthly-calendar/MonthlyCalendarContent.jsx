@@ -10,7 +10,12 @@ import {
   BedDouble,
   LogIn,
   LogOut,
-  AlertTriangle
+  AlertTriangle,
+  LayoutGrid,
+  List,
+  TrendingUp,
+  Users,
+  CheckCircle2
 } from 'lucide-react';
 import {
   startOfMonth,
@@ -23,9 +28,10 @@ import {
   isToday
 } from 'date-fns';
 import { cx } from '../common/ui';
-import { iso, today } from '../../utils/format';
+import { iso, today, fmtDate, money } from '../../utils/format';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const SHORT_WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
@@ -46,6 +52,7 @@ export default function MonthlyCalendarContent({
   const [selectedRoomType, setSelectedRoomType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [mobileViewMode, setMobileViewMode] = useState('grid'); // 'grid' | 'list'
 
   const rawRooms = calendarData?.rooms || [];
 
@@ -210,7 +217,7 @@ export default function MonthlyCalendarContent({
   const currentMonthIdx = currentMonth.getMonth();
 
   return (
-    <div className="flex flex-col h-full min-h-0 space-y-2">
+    <div className="flex flex-col h-full min-h-0 space-y-2 sm:space-y-2.5">
 
       {/* 1. Top Header & Navigation Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-200/80 pb-2 shrink-0">
@@ -245,7 +252,7 @@ export default function MonthlyCalendarContent({
             <div className="flex items-center rounded-xl border border-slate-200 bg-white shadow-xs p-0.5">
               <button
                 onClick={() => onMonthChange(subMonths(currentMonth, 1))}
-                className="p-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-1 sm:p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
                 title="Previous Month"
                 aria-label="Previous Month"
               >
@@ -259,7 +266,7 @@ export default function MonthlyCalendarContent({
               </button>
               <button
                 onClick={() => onMonthChange(addMonths(currentMonth, 1))}
-                className="p-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-1 sm:p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
                 title="Next Month"
                 aria-label="Next Month"
               >
@@ -267,7 +274,7 @@ export default function MonthlyCalendarContent({
               </button>
             </div>
 
-            {/* Compact dropdowns for desktop / larger tablets */}
+            {/* Compact dropdowns for desktop / tablets */}
             <div className="hidden md:flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-0.5 shadow-xs">
               <select
                 value={currentMonthIdx}
@@ -292,14 +299,51 @@ export default function MonthlyCalendarContent({
           </div>
         </div>
 
-        {/* Right side: High-density KPI strip & Action button */}
-        <div className="flex items-center justify-between sm:justify-end gap-2">
+        {/* Right side: View Switcher, Filter Toggle, Desktop KPIs & Action button */}
+        <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2">
+          {/* Mobile Grid/List View Switcher */}
+          <div className="flex items-center rounded-xl border border-slate-200 bg-white p-0.5 shadow-xs">
+            <button
+              type="button"
+              onClick={() => setMobileViewMode('grid')}
+              className={cx(
+                'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all',
+                mobileViewMode === 'grid'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              )}
+              title="7-Day Grid View"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Grid</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileViewMode('list')}
+              className={cx(
+                'flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold transition-all',
+                mobileViewMode === 'list'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              )}
+              title="Day-by-Day List View"
+            >
+              <List className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Agenda</span>
+            </button>
+          </div>
+
           {/* Mobile Filter Toggle */}
           <button
             onClick={() => setShowMobileFilters(!showMobileFilters)}
-            className="sm:hidden flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs"
+            className={cx(
+              'sm:hidden flex items-center gap-1 rounded-xl border px-2.5 py-1 text-xs font-bold transition-all shadow-xs',
+              showMobileFilters
+                ? 'bg-blue-50 border-blue-200 text-blue-700'
+                : 'bg-white border-slate-200 text-slate-700'
+            )}
           >
-            <SlidersHorizontal className="h-3.5 w-3.5 text-slate-500" />
+            <SlidersHorizontal className="h-3.5 w-3.5" />
             <span>Filters</span>
           </button>
 
@@ -328,14 +372,39 @@ export default function MonthlyCalendarContent({
             className="flex items-center gap-1 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 shrink-0"
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>+ Booking</span>
+            <span className="hidden xs:inline">+ Booking</span>
+            <span className="xs:hidden">+</span>
           </button>
         </div>
       </div>
 
-      {/* 2. Responsive Filters Bar & Legend */}
+      {/* 2. Mobile Responsive KPI Ribbon (Visible on Mobile & Tablets) */}
+      <div className="xl:hidden flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1 shrink-0 -mx-1 px-1">
+        <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-xs font-bold shrink-0 shadow-2xs">
+          <span className="text-[10px] text-slate-400 uppercase font-extrabold">Occ</span>
+          <span className="text-blue-600">{aggregateStats.avgOccupancy}%</span>
+        </div>
+        <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-xs font-bold shrink-0 shadow-2xs">
+          <span className="text-[10px] text-emerald-600 uppercase font-extrabold">Arr</span>
+          <span className="text-emerald-700">{aggregateStats.totalArrivals}</span>
+        </div>
+        <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-xs font-bold shrink-0 shadow-2xs">
+          <span className="text-[10px] text-rose-600 uppercase font-extrabold">Dep</span>
+          <span className="text-rose-700">{aggregateStats.totalDepartures}</span>
+        </div>
+        <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-xs font-bold shrink-0 shadow-2xs">
+          <span className="text-[10px] text-slate-400 uppercase font-extrabold">Est. Rev</span>
+          <span className="text-slate-800">₹{(aggregateStats.estimatedRevenue / 1000).toFixed(0)}k</span>
+        </div>
+        <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-xs font-bold shrink-0 shadow-2xs">
+          <span className="text-[10px] text-slate-400 uppercase font-extrabold">Rooms</span>
+          <span className="text-slate-700">{totalRoomsCount}</span>
+        </div>
+      </div>
+
+      {/* 3. Responsive Filters Bar & Legend */}
       <div className={cx(
-        'rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-xs shrink-0',
+        'rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-xs shrink-0',
         showMobileFilters ? 'block' : 'hidden sm:block'
       )}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -394,43 +463,163 @@ export default function MonthlyCalendarContent({
         </div>
       </div>
 
-      {/* 3. 7-Day Monthly Grid: Full Width and Full Height Fit */}
-      <div className="flex-1 min-h-0 flex flex-col rounded-xl sm:rounded-2xl border-2 border-slate-300 bg-white shadow-sm overflow-hidden w-full">
+      {/* 4. VIEW A: 7-Day Monthly Grid (Responsive with Mobile Adaptation) */}
+      {mobileViewMode === 'grid' && (
+        <div className="flex-1 min-h-0 flex flex-col rounded-xl sm:rounded-2xl border-2 border-slate-300 bg-white shadow-sm overflow-hidden w-full">
 
-        {/* Weekday Header Row */}
-        <div className="grid grid-cols-7 border-b-2 border-slate-300 bg-slate-100 text-center divide-x divide-slate-300 shrink-0">
-          {WEEKDAYS.map((dayName, idx) => (
-            <div
-              key={dayName}
-              className={cx(
-                'py-2 uppercase tracking-wider text-[10px] sm:text-[11px] font-black truncate px-0.5',
-                (idx === 0 || idx === 6) ? 'text-blue-800 bg-blue-50/60' : 'text-slate-800'
-              )}
-            >
-              <span className="sm:hidden">{dayName.slice(0, 2)}</span>
-              <span className="hidden sm:inline">{dayName}</span>
-            </div>
-          ))}
+          {/* Weekday Header Row */}
+          <div className="grid grid-cols-7 border-b-2 border-slate-300 bg-slate-100 text-center divide-x divide-slate-300 shrink-0">
+            {WEEKDAYS.map((dayName, idx) => (
+              <div
+                key={dayName}
+                className={cx(
+                  'py-1.5 sm:py-2 uppercase tracking-wider text-[10px] sm:text-[11px] font-black truncate px-0.5',
+                  (idx === 0 || idx === 6) ? 'text-blue-800 bg-blue-50/60' : 'text-slate-800'
+                )}
+              >
+                <span className="xs:hidden">{SHORT_WEEKDAYS[idx]}</span>
+                <span className="hidden xs:inline sm:hidden">{dayName.slice(0, 3)}</span>
+                <span className="hidden sm:inline">{dayName}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Days Grid: Proportional on desktop, responsive & scrollable on mobile */}
+          <div
+            className="grid grid-cols-7 flex-1 min-h-0 divide-x divide-y divide-slate-300/90 bg-slate-50/20 overflow-y-auto custom-scrollbar"
+            style={{
+              gridTemplateRows: `repeat(${numRows}, minmax(64px, 1fr))`
+            }}
+          >
+            {paddingDays.map((_, idx) => (
+              <div key={`pad-${idx}`} className="h-full min-h-[64px] bg-slate-100/40 p-1 sm:p-2 select-none border-b border-slate-300/90" />
+            ))}
+
+            {monthStats.map((d) => {
+              const todayCell = isToday(d.date);
+              const availableCount = Math.max(0, d.totalRooms - d.occupiedCount);
+
+              let barColor = 'bg-emerald-500';
+              if (d.occupancyPercentage > 70) {
+                barColor = 'bg-rose-500';
+              } else if (d.occupancyPercentage > 30) {
+                barColor = 'bg-amber-500';
+              }
+
+              return (
+                <div
+                  key={d.day}
+                  onClick={() => onDateClick(d.date, d)}
+                  className={cx(
+                    'group relative h-full min-h-[64px] cursor-pointer bg-white p-1 sm:p-2 transition-all duration-150 flex flex-col justify-between hover:bg-blue-50/50 hover:shadow-md hover:z-10 active:bg-blue-100/40 select-none',
+                    todayCell && 'ring-2 ring-inset ring-blue-500 bg-blue-50/30'
+                  )}
+                >
+                  {/* Top: Day Number & Occupancy */}
+                  <div>
+                    <div className="flex items-center justify-between gap-0.5">
+                      <span
+                        className={cx(
+                          'flex h-5 w-5 sm:h-6 sm:w-6 lg:h-7 lg:w-7 items-center justify-center rounded-lg text-[10px] sm:text-xs font-black transition-all shrink-0',
+                          todayCell
+                            ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 ring-blue-300'
+                            : 'text-slate-800 group-hover:text-blue-600 group-hover:bg-blue-50'
+                        )}
+                      >
+                        {d.day}
+                      </span>
+
+                      <div className="text-right leading-tight">
+                        <span className="text-[9px] sm:text-[11px] font-black text-slate-800">
+                          {d.occupancyPercentage}%
+                        </span>
+                        <span className="text-[8px] sm:text-[9px] font-semibold text-slate-400 hidden lg:block">
+                          {d.occupiedCount}/{d.totalRooms}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="mt-0.5 sm:mt-1 h-1 sm:h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className={cx('h-full transition-all rounded-full', barColor)}
+                        style={{ width: `${Math.min(100, Math.max(0, d.occupancyPercentage))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Middle: Free count (shown on tablet/desktop) */}
+                  <div className="hidden sm:flex items-center justify-between text-[9px] font-semibold text-slate-500 my-0.5">
+                    <span className="text-slate-600 truncate">
+                      <span className="text-emerald-600 font-bold">{availableCount}</span> free
+                    </span>
+                    {d.dailyEstRevenue > 0 && (
+                      <span className="text-slate-400 hidden xl:inline">
+                        ₹{(d.dailyEstRevenue / 1000).toFixed(1)}k
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Bottom: Arrivals & Departures Badges */}
+                  <div className="pt-0.5 border-t border-slate-100 flex items-center justify-between text-[8px] sm:text-[10px] font-bold">
+                    <div className="flex items-center gap-0.5 sm:gap-1">
+                      <span
+                        className={cx(
+                          'inline-flex items-center gap-0.5 px-0.5 sm:px-1 py-0.2 rounded text-[8px] sm:text-[9px] font-bold transition-colors',
+                          d.arrivalsCount > 0
+                            ? 'text-emerald-800 bg-emerald-100/90 border border-emerald-200'
+                            : 'text-slate-300 bg-slate-50'
+                        )}
+                        title={`${d.arrivalsCount} Arrivals`}
+                      >
+                        <span className="font-black text-emerald-600">A</span>{d.arrivalsCount}
+                      </span>
+
+                      <span
+                        className={cx(
+                          'inline-flex items-center gap-0.5 px-0.5 sm:px-1 py-0.2 rounded text-[8px] sm:text-[9px] font-bold transition-colors',
+                          d.departuresCount > 0
+                            ? 'text-rose-800 bg-rose-100/90 border border-rose-200'
+                            : 'text-slate-300 bg-slate-50'
+                        )}
+                        title={`${d.departuresCount} Departures`}
+                      >
+                        <span className="font-black text-rose-600">D</span>{d.departuresCount}
+                      </span>
+                    </div>
+
+                    {d.exceptionsCount > 0 && (
+                      <span
+                        className="h-1.5 w-1.5 rounded-full bg-amber-500 ring-1 ring-amber-200 shrink-0"
+                        title={`${d.exceptionsCount} maintenance / block exceptions`}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
         </div>
+      )}
 
-        {/* Days Grid: Exactly fits full screen height across all rows */}
-        <div
-          className="grid grid-cols-7 flex-1 min-h-0 divide-x divide-y divide-slate-300/90 bg-slate-50/20"
-          style={{ gridTemplateRows: `repeat(${numRows}, minmax(0, 1fr))` }}
-        >
-          {paddingDays.map((_, idx) => (
-            <div key={`pad-${idx}`} className="h-full min-h-0 bg-slate-100/40 p-2 select-none border-b border-slate-300/90" />
-          ))}
-
+      {/* 4. VIEW B: Mobile Day-by-Day Agenda List View */}
+      {mobileViewMode === 'list' && (
+        <div className="flex-1 min-h-0 rounded-xl sm:rounded-2xl border border-slate-200 bg-white shadow-xs overflow-y-auto custom-scrollbar divide-y divide-slate-100">
           {monthStats.map((d) => {
             const todayCell = isToday(d.date);
             const availableCount = Math.max(0, d.totalRooms - d.occupiedCount);
+            const weekdayName = format(d.date, 'EEEE');
+            const shortDay = format(d.date, 'EEE');
 
-            let barColor = 'bg-emerald-500';
+            let badgeBg = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+            let barBg = 'bg-emerald-500';
             if (d.occupancyPercentage > 70) {
-              barColor = 'bg-rose-500';
+              badgeBg = 'bg-rose-50 text-rose-700 border-rose-200';
+              barBg = 'bg-rose-500';
             } else if (d.occupancyPercentage > 30) {
-              barColor = 'bg-amber-500';
+              badgeBg = 'bg-amber-50 text-amber-700 border-amber-200';
+              barBg = 'bg-amber-500';
             }
 
             return (
@@ -438,98 +627,75 @@ export default function MonthlyCalendarContent({
                 key={d.day}
                 onClick={() => onDateClick(d.date, d)}
                 className={cx(
-                  'group relative h-full min-h-0 cursor-pointer bg-white p-1 sm:p-2.5 transition-all duration-150 flex flex-col justify-between hover:bg-blue-50/50 hover:shadow-md hover:z-10',
-                  todayCell && 'ring-2 ring-inset ring-blue-500 bg-blue-50/30'
+                  'p-3 sm:p-4 hover:bg-blue-50/40 active:bg-blue-100/50 cursor-pointer transition-colors flex items-center justify-between gap-3',
+                  todayCell && 'bg-blue-50/40 border-l-4 border-l-blue-600'
                 )}
               >
-                {/* Top: Day Number & Occupancy */}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={cx(
-                        'flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg text-[11px] sm:text-xs font-extrabold transition-all',
-                        todayCell
-                          ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30 ring-1 sm:ring-2 ring-blue-300'
-                          : 'text-slate-800 group-hover:text-blue-600 group-hover:bg-blue-50'
-                      )}
-                    >
-                      {d.day}
-                    </span>
-
-                    <div className="text-right">
-                      <div className="flex items-baseline gap-1 justify-end">
-                        <span className="text-[10px] sm:text-xs font-black text-slate-800">
-                          {d.occupancyPercentage}%
-                        </span>
-                      </div>
-                      <span className="text-[9px] sm:text-[10px] font-semibold text-slate-400 hidden sm:block -mt-0.5">
-                        {d.occupiedCount}/{d.totalRooms}
+                {/* Left: Date Badge */}
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className={cx(
+                    'grid h-12 w-12 place-items-center rounded-2xl font-black text-center leading-none transition-all shadow-2xs',
+                    todayCell
+                      ? 'bg-blue-600 text-white shadow-blue-500/30'
+                      : 'bg-slate-100 text-slate-800'
+                  )}>
+                    <div>
+                      <span className="text-base font-black">{d.day}</span>
+                      <span className="block text-[9px] uppercase font-bold tracking-wider mt-0.5 opacity-80">
+                        {shortDay}
                       </span>
                     </div>
                   </div>
 
-                  {/* Progress Bar */}
-                  <div className="mt-1 sm:mt-1.5 h-1 sm:h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className={cx('h-full transition-all rounded-full', barColor)}
-                      style={{ width: `${Math.min(100, Math.max(0, d.occupancyPercentage))}%` }}
-                    />
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs sm:text-sm font-extrabold text-slate-900">
+                        {fmtDate(d.date, 'd MMMM yyyy')}
+                      </p>
+                      {todayCell && (
+                        <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-blue-700">
+                          Today
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                      {d.occupiedCount} of {d.totalRooms} rooms occupied • <span className="text-emerald-600 font-bold">{availableCount} free</span>
+                    </p>
                   </div>
                 </div>
 
-                {/* Middle: Availability summary (hidden on very small viewports if tight) */}
-                <div className="my-0.5 hidden xs:flex sm:flex items-center justify-between text-[9px] sm:text-[10px] font-medium text-slate-500">
-                  <span className="text-slate-600 font-semibold truncate">
-                    <span className="text-emerald-600 font-bold">{availableCount}</span> free
-                  </span>
+                {/* Right: Occupancy Bar & Badges */}
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className={cx('px-2 py-0.5 rounded-lg border text-[11px] font-black', badgeBg)}>
+                      {d.occupancyPercentage}% Occ
+                    </span>
+
+                    {d.arrivalsCount > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200">
+                        <LogIn className="h-3 w-3 text-emerald-600" /> {d.arrivalsCount}
+                      </span>
+                    )}
+
+                    {d.departuresCount > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-800 border border-rose-200">
+                        <LogOut className="h-3 w-3 text-rose-600" /> {d.departuresCount}
+                      </span>
+                    )}
+                  </div>
+
                   {d.dailyEstRevenue > 0 && (
-                    <span className="text-slate-400 font-medium hidden md:inline">
-                      ₹{(d.dailyEstRevenue / 1000).toFixed(1)}k
+                    <span className="text-[10px] font-bold text-slate-400">
+                      Est. Rev: {money(d.dailyEstRevenue)}
                     </span>
-                  )}
-                </div>
-
-                {/* Bottom: Arrivals & Departures Badges */}
-                <div className="pt-0.5 sm:pt-1 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-[11px] font-bold">
-                  <div className="flex items-center gap-0.5 sm:gap-1.5">
-                    <span
-                      className={cx(
-                        'inline-flex items-center gap-0.5 px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded text-[9px] sm:text-[10px] font-bold transition-colors',
-                        d.arrivalsCount > 0
-                          ? 'text-emerald-800 bg-emerald-100/80 border border-emerald-200/60'
-                          : 'text-slate-400 bg-slate-50'
-                      )}
-                      title={`${d.arrivalsCount} Arrivals`}
-                    >
-                      <span className="text-[8px] sm:text-[9px] font-black text-emerald-600">A</span> {d.arrivalsCount}
-                    </span>
-
-                    <span
-                      className={cx(
-                        'inline-flex items-center gap-0.5 px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded text-[9px] sm:text-[10px] font-bold transition-colors',
-                        d.departuresCount > 0
-                          ? 'text-rose-800 bg-rose-100/80 border border-rose-200/60'
-                          : 'text-slate-400 bg-slate-50'
-                      )}
-                      title={`${d.departuresCount} Departures`}
-                    >
-                      <span className="text-[8px] sm:text-[9px] font-black text-rose-600">D</span> {d.departuresCount}
-                    </span>
-                  </div>
-
-                  {d.exceptionsCount > 0 && (
-                    <span
-                      className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-amber-500 ring-1 sm:ring-2 ring-amber-200"
-                      title={`${d.exceptionsCount} maintenance / block exceptions`}
-                    />
                   )}
                 </div>
               </div>
             );
           })}
         </div>
+      )}
 
-      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -33,7 +33,7 @@ export default function CheckInPage() {
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [checklist, setChecklist] = useState({ id: false, pay: false, room: true, sign: false });
+  const [checklist, setChecklist] = useState({ id: false, pay: false, room: false, sign: false });
 
   const q = useQuery({ queryKey: ['arrivals'], queryFn: bookingApi.arrivals, refetchInterval: 30000 });
   const openBookingDrawer = useUI((s) => s.openBooking);
@@ -48,6 +48,10 @@ export default function CheckInPage() {
   const completedArrivals = arrivals.filter((b) => b.bookingStatus === 'checked_in');
 
   const activeGuest = selectedBooking || pendingArrivals[0] || completedArrivals[0] || null;
+
+  useEffect(() => {
+    setChecklist({ id: false, pay: false, room: false, sign: false });
+  }, [activeGuest?._id]);
 
   const totalPendingPay = pendingArrivals.reduce((sum, b) => sum + (b.balanceAmount || 10080), 0) || 16800;
   const readyRoomsCount = pendingArrivals.filter((b) => ['clean', 'inspected'].includes(b.room?.housekeepingStatus)).length || 2;
@@ -441,13 +445,13 @@ export default function CheckInPage() {
                   <div className="space-y-2">
                     <p className="font-extrabold text-slate-900">Payment Summary</p>
                     <div className="space-y-1 text-slate-600">
-                      <div className="flex justify-between"><span className="text-slate-400">Room Rate (night):</span> <b>{money(activeGuest.roomRate || 3000)}</b></div>
-                      <div className="flex justify-between"><span className="text-slate-400">Subtotal:</span> <b>{money((activeGuest.roomRate || 3000) * (activeGuest.nights || 3))}</b></div>
-                      <div className="flex justify-between"><span className="text-slate-400">Tax (12%):</span> <b>{money(1080)}</b></div>
-                      <div className="flex justify-between font-extrabold border-t border-slate-100 pt-1 text-slate-900"><span>Total Amount:</span> <b>{money(activeGuest.totalAmount || 10080)}</b></div>
+                      <div className="flex justify-between"><span className="text-slate-400">Room Rate (night):</span> <b>{money(activeGuest.roomRate || 0)}</b></div>
+                      <div className="flex justify-between"><span className="text-slate-400">Subtotal:</span> <b>{money((activeGuest.roomRate || 0) * (activeGuest.nights || 1) + (activeGuest.extraBedCharge || 0) + (activeGuest.otherCharges || 0))}</b></div>
+                      <div className="flex justify-between"><span className="text-slate-400">Tax ({activeGuest.taxPercent || 0}%):</span> <b>{money(activeGuest.tax || 0)}</b></div>
+                      <div className="flex justify-between font-extrabold border-t border-slate-100 pt-1 text-slate-900"><span>Total Amount:</span> <b>{money(activeGuest.totalAmount || 0)}</b></div>
                       <div className="flex justify-between text-slate-500"><span>Paid Amount:</span> <b>{money(activeGuest.paidAmount || 0)}</b></div>
                       <div className="flex justify-between rounded-xl bg-rose-50 p-2 font-black text-rose-700 mt-1">
-                        <span>Balance Due:</span> <span>{money(activeGuest.balanceAmount || 10080)}</span>
+                        <span>Balance Due:</span> <span>{money(activeGuest.balanceAmount || 0)}</span>
                       </div>
                     </div>
                   </div>

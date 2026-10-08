@@ -112,11 +112,16 @@ function WizardInner({ opts, onClose, onDone }) {
   };
 
   const nights = Math.max(0, differenceInCalendarDays(parseISO(v.checkOutDate || t), parseISO(v.checkInDate || t)));
-  const settings = useQuery({ queryKey: ['settings'], queryFn: () => unwrap(api.get('/settings')), staleTime: 300000 });
+  const { data: hotelSettings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => unwrap(api.get('/settings'))
+  });
+  const defaultHotelTax = Number(hotelSettings?.hotel?.booking?.taxPercent ?? 12);
+  const [customTaxRate, setCustomTaxRate] = useState(null);
+  const taxRate = customTaxRate !== null ? customTaxRate : defaultHotelTax;
   const [applyTax, setApplyTax] = useState(true);
-  const hotelTax = settings.data?.hotel?.booking?.taxPercent ?? 12;
-  const taxPercent = applyTax ? hotelTax : 0;
-  const totals = useMemo(() => calcTotals({ ...v, roomRate: Number(v.roomRate), nights, taxPercent, discount: Number(v.discount) }), [v.roomRate, v.extraBedCharge, v.otherCharges, v.discount, nights, taxPercent]);
+  const activeTaxPercent = applyTax ? (Number(taxRate) || 0) : 0;
+  const totals = useMemo(() => calcTotals({ ...v, roomRate: Number(v.roomRate), nights, taxPercent: activeTaxPercent, discount: Number(v.discount) }), [v.roomRate, v.extraBedCharge, v.otherCharges, v.discount, nights, activeTaxPercent]);
 
   const avail = useQuery({
     queryKey: ['availability', v.checkInDate, v.checkOutDate, v.adults, v.children], enabled: step === 2 && nights > 0,
@@ -146,7 +151,7 @@ function WizardInner({ opts, onClose, onDone }) {
       coGuests: validCoGuests,
       room: room._id, checkInDate: v.checkInDate, checkOutDate: v.checkOutDate, adults: Number(v.adults), children: Number(v.children),
       ...(can('bookings.edit_rate') ? { roomRate: Number(v.roomRate) } : {}),
-      extraBedCharge: Number(v.extraBedCharge), otherCharges: Number(v.otherCharges), discount: Number(v.discount), taxPercent, source: walkIn ? 'walk_in' : 'reception', notes: v.notes || undefined,
+      extraBedCharge: Number(v.extraBedCharge), otherCharges: Number(v.otherCharges), discount: Number(v.discount), taxPercent: activeTaxPercent, source: walkIn ? 'walk_in' : 'reception', notes: v.notes || undefined,
       checkInNow: v.checkInNow && v.checkInDate === t, ...(amt > 0 && { payment: { amount: amt, method: v.payMethod } })
     });
   };
@@ -673,59 +678,105 @@ function WizardInner({ opts, onClose, onDone }) {
 
       {/* Step 3: Pricing */}
       {step === 3 && (
-        <div className="grid gap-3.5 sm:grid-cols-2">
-          <Field label="Room Rate Per Night" hint={!can('bookings.edit_rate') ? 'Only managers can change rate.' : undefined}>
-            <input type="number" className="input" disabled={!can('bookings.edit_rate')} {...f.register('roomRate')} />
-          </Field>
-          <Field label="Nights">
-            <input className="input" disabled value={nights} />
-          </Field>
-          <Field label="Extra Bed Charge">
-            <input type="number" min="0" className="input" {...f.register('extraBedCharge')} />
-          </Field>
-          <Field label="Other Charges">
-            <input type="number" min="0" className="input" {...f.register('otherCharges')} />
-          </Field>
-          <Field label="Discount" hint={!can('bookings.give_discount') ? 'Admin permission required to give discounts.' : undefined} error={Number(v.discount) > totals.subtotal ? 'Discount cannot exceed subtotal.' : undefined}>
-            <input type="number" min="0" className="input" disabled={!can('bookings.give_discount')} {...f.register('discount')} />
-          </Field>
-          <Field label="Notes">
-            <input className="input" placeholder="Optional notes" {...f.register('notes')} />
-          </Field>
-          <div className="sm:col-span-2 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/90 p-3.5 shadow-2xs">
-            <label htmlFor="wizardApplyTax" className="flex items-center gap-3 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                id="wizardApplyTax"
-                checked={applyTax}
-                onChange={(e) => setApplyTax(e.target.checked)}
-                className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-              />
-              <div>
-                <p className="text-xs font-bold text-slate-900">Apply {hotelTax}% GST / Tax (Optional)</p>
-                <p className="text-[11px] text-slate-500">Tick to include {hotelTax}% tax, or untick to make booking tax-free (0%).</p>
-              </div>
-            </label>
-            <button
-              type="button"
-              onClick={() => setApplyTax(!applyTax)}
-              className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all ${
-                applyTax
-                  ? 'bg-blue-50 border-blue-200 text-blue-700'
-                  : 'bg-slate-100 border-slate-200 text-slate-500'
-              }`}
-            >
-              {applyTax ? `✓ ${hotelTax}% Tax Active` : '✕ No Tax (0%)'}
-            </button>
+        <div className="space-y-4">
+          <div className="grid gap-3.5 sm:grid-cols-2">
+            <Field label="Room Rate Per Night" hint={!can('bookings.edit_rate') ? 'Only managers can change rate.' : undefined}>
+              <input type="number" className="input font-bold" disabled={!can('bookings.edit_rate')} {...f.register('roomRate')} />
+            </Field>
+            <Field label="Nights">
+              <input className="input font-bold" disabled value={nights} />
+            </Field>
+            <Field label="Extra Bed Charge">
+              <input type="number" min="0" className="input" {...f.register('extraBedCharge')} />
+            </Field>
+            <Field label="Other Charges">
+              <input type="number" min="0" className="input" {...f.register('otherCharges')} />
+            </Field>
+            <Field label="Discount" hint={!can('bookings.give_discount') ? 'Admin permission required to give discounts.' : undefined} error={Number(v.discount) > totals.subtotal ? 'Discount cannot exceed subtotal.' : undefined}>
+              <input type="number" min="0" className="input" disabled={!can('bookings.give_discount')} {...f.register('discount')} />
+            </Field>
+            <Field label="Notes">
+              <input className="input" placeholder="Optional notes" {...f.register('notes')} />
+            </Field>
           </div>
-          <Totals totals={totals} taxPercent={taxPercent} className="sm:col-span-2" />
+
+          {/* Dynamic & Optional Tax Toggle */}
+          <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/90 p-4 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="wizardApplyTax" className="flex items-center gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  id="wizardApplyTax"
+                  checked={applyTax}
+                  onChange={(e) => setApplyTax(e.target.checked)}
+                  className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+                <div>
+                  <p className="text-xs font-bold text-slate-900">
+                    Apply {applyTax ? `${taxRate}%` : ''} GST / Tax (Optional)
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Tick to calculate tax dynamically, or untick to make stay tax-free (0%).
+                  </p>
+                </div>
+              </label>
+              <button
+                type="button"
+                onClick={() => setApplyTax(!applyTax)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all ${
+                  applyTax
+                    ? 'bg-blue-50 border-blue-200 text-blue-700'
+                    : 'bg-slate-100 border-slate-200 text-slate-500'
+                }`}
+              >
+                {applyTax ? `✓ ${taxRate}% Tax Active` : '✕ No Tax (0%)'}
+              </button>
+            </div>
+
+            {applyTax && (
+              <div className="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-600">Tax Rate (%):</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="any"
+                    value={taxRate}
+                    onChange={(e) => setCustomTaxRate(Number(e.target.value) || 0)}
+                    className="input w-24 py-1 px-2.5 text-xs font-bold text-slate-900 bg-white"
+                  />
+                  <span className="text-[11px] text-slate-400">Hotel default: {defaultHotelTax}%</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-medium text-slate-400">Quick rate:</span>
+                  {[0, 5, 12, 18, 28].map((rate) => (
+                    <button
+                      key={rate}
+                      type="button"
+                      onClick={() => setCustomTaxRate(rate)}
+                      className={`px-2 py-0.5 text-[11px] font-bold rounded-lg border transition-all ${
+                        Number(taxRate) === rate
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {rate}%
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Totals totals={totals} taxPercent={activeTaxPercent} className="sm:col-span-2" />
         </div>
       )}
 
       {/* Step 4: Payment */}
       {step === 4 && (
         <div className="space-y-4">
-          <Totals totals={totals} taxPercent={taxPercent} />
+          <Totals totals={totals} taxPercent={activeTaxPercent} />
           <div className="grid grid-cols-3 gap-2">
             {[
               ['unpaid', 'Unpaid'],
@@ -849,7 +900,11 @@ export function Totals({ totals, taxPercent, className }) {
   return (
     <dl className={cx('space-y-1.5 rounded-2xl border border-slate-200/80 bg-slate-50 p-4 text-xs', className)}>
       <div className="flex justify-between"><dt className="text-slate-500 font-medium">Subtotal</dt><dd className="font-bold text-slate-900">{money(totals.subtotal)}</dd></div>
-      <div className="flex justify-between"><dt className="text-slate-500 font-medium">Tax ({taxPercent}%)</dt><dd className="font-bold text-slate-900">{money(totals.tax)}</dd></div>
+      {taxPercent > 0 ? (
+        <div className="flex justify-between"><dt className="text-slate-500 font-medium">Tax ({taxPercent}%)</dt><dd className="font-bold text-slate-900">{money(totals.tax)}</dd></div>
+      ) : (
+        <div className="flex justify-between text-slate-400"><dt className="font-medium">Tax (0% - Exempt)</dt><dd className="font-medium">{money(0)}</dd></div>
+      )}
       <div className="flex justify-between border-t border-slate-200 pt-2 text-sm"><dt className="font-extrabold text-slate-900">Total Amount</dt><dd className="font-extrabold text-blue-600">{money(totals.total)}</dd></div>
     </dl>
   );
