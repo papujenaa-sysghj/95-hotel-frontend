@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   BedDouble,
   LogOut,
+  LogIn,
   Pencil,
   ArrowRightLeft,
   CalendarPlus,
@@ -84,6 +85,26 @@ export default function BookingDrawer() {
                 <Badge status={b.paymentStatus} />
               </div>
             </div>
+
+            {/* Cancellation Notice Banner */}
+            {b.bookingStatus === 'cancelled' && (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-rose-900 space-y-1.5 shadow-2xs">
+                <div className="flex items-center gap-2 font-black text-sm text-rose-800">
+                  <Ban className="h-4.5 w-4.5 text-rose-600 shrink-0" />
+                  <span>This Booking is Cancelled</span>
+                </div>
+                {b.cancelReason && (
+                  <p className="text-xs font-semibold text-rose-700">
+                    <span className="font-bold text-rose-900">Reason:</span> {b.cancelReason}
+                  </p>
+                )}
+                {b.updatedAt && (
+                  <p className="text-[11px] text-rose-600 font-medium">
+                    Updated {fmtDateTime(b.updatedAt)}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Guest Header Card */}
             <div className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 shadow-2xs">
@@ -299,6 +320,26 @@ export default function BookingDrawer() {
                       <LogOut className="h-4 w-4" /> Check out
                     </span>
                     <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
+                {['hold', 'confirmed'].includes(b.bookingStatus) && can('checkin.perform') && (
+                  <button
+                    onClick={() => checkIn.mutate()}
+                    disabled={checkIn.isPending}
+                    className="flex items-center justify-between rounded-xl bg-emerald-600 p-3 text-xs font-bold text-white hover:bg-emerald-700 shadow-xs transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      {checkIn.isPending ? <Spinner /> : <LogIn className="h-4 w-4" />} Check in
+                    </span>
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
+                {['hold', 'confirmed'].includes(b.bookingStatus) && can('bookings.cancel') && (
+                  <button
+                    onClick={() => setModal('cancel')}
+                    className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50/70 p-3 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors shadow-2xs"
+                  >
+                    <Ban className="h-4 w-4 text-rose-600" /> Cancel booking
                   </button>
                 )}
                 {active && can('bookings.edit') && (
@@ -635,6 +676,11 @@ function PayModal({ open, refund, b, onClose, inv }) {
 
 function CancelModal({ open, b, onClose, inv }) {
   const [reason, setReason] = useState('');
+
+  useEffect(() => {
+    if (open) setReason('');
+  }, [open]);
+
   const m = useMutate(() => bookingApi.cancel(b._id, reason), {
     success: 'Booking cancelled. The room is free again.',
     invalidate: inv,
@@ -649,22 +695,28 @@ function CancelModal({ open, b, onClose, inv }) {
       title="Cancel this booking?"
       footer={
         <>
-          <button className="btn-ghost" onClick={onClose}>
+          <button className="btn-ghost" onClick={onClose} disabled={m.isPending}>
             Keep booking
           </button>
-          <button className="btn-danger" disabled={reason.length < 3 || m.isPending} onClick={() => m.mutate()}>
+          <button className="btn-danger" disabled={reason.trim().length < 3 || m.isPending} onClick={() => m.mutate()}>
             {m.isPending && <Spinner />}Cancel booking
           </button>
         </>
       }
     >
-      <Field label="Reason for cancelling">
-        <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} autoFocus />
+      <Field label="Reason for cancelling" hint="Please provide a reason (min 3 characters).">
+        <input
+          className="input"
+          placeholder="e.g. Guest requested cancellation / Plan changed"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          autoFocus
+        />
       </Field>
       {b.paidAmount > 0 && (
-        <p className="mt-2 text-sm font-medium text-amber-700">
-          {money(b.paidAmount)} has been paid. Record a refund separately if it is being returned.
-        </p>
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-800">
+          ⚠️ <b>{money(b.paidAmount)}</b> has been collected for this booking. Record a refund separately from Payments if it is being returned.
+        </div>
       )}
     </Modal>
   );
