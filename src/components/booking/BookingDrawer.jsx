@@ -23,10 +23,18 @@ import {
   Sparkles,
   Eye,
   ShieldCheck,
+  Users,
+  UserPlus,
+  Trash2,
+  Upload,
+  MapPin,
+  Globe,
+  Tag,
+  Receipt,
 } from 'lucide-react';
+import api, { unwrap, openPdf, openDocUrl, errMsg } from '../../services/api';
 import { bookingApi } from '../../services/booking.api';
 import { paymentApi } from '../../services/payment.api';
-import { openPdf, openDocUrl, errMsg } from '../../services/api';
 import { useUI } from '../../store/ui';
 import { useCan } from '../../store/auth';
 import { useMutate } from '../../hooks/useMutate';
@@ -431,69 +439,594 @@ const Row = ({ k, v, strong, warn }) => (
 
 function EditModal({ open, b, onClose, inv }) {
   const can = useCan();
-  const [v, setV] = useState(null);
-  const s = v || {
-    adults: b.adults,
-    children: b.children,
-    extraBedCharge: b.extraBedCharge,
-    otherCharges: b.otherCharges,
-    discount: b.discount,
-    roomRate: b.roomRate,
-    notes: b.notes || '',
+  const [tab, setTab] = useState('guest'); // 'guest' | 'party' | 'pricing' | 'notes'
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [uploadingCoDocs, setUploadingCoDocs] = useState({});
+
+  const [form, setForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    idType: 'Aadhaar',
+    idNumber: '',
+    idDocumentUrl: '',
+    nationality: 'Indian',
+    adults: 1,
+    children: 0,
+    coGuests: [],
+    roomRate: 0,
+    extraBedCharge: 0,
+    otherCharges: 0,
+    discount: 0,
+    source: 'reception',
+    notes: '',
+  });
+
+  useEffect(() => {
+    if (open && b) {
+      setTab('guest');
+      setForm({
+        name: b.guest?.name || '',
+        phone: b.guest?.phone || '',
+        email: b.guest?.email || '',
+        address: b.guest?.address || '',
+        idType: b.guest?.idType || 'Aadhaar',
+        idNumber: b.guest?.idNumber || '',
+        idDocumentUrl: b.guest?.idDocumentUrl || '',
+        nationality: b.guest?.nationality || 'Indian',
+        adults: b.adults || 1,
+        children: b.children || 0,
+        coGuests: Array.isArray(b.coGuests)
+          ? b.coGuests.map((cg) => ({
+              name: cg.name || '',
+              idType: cg.idType || 'Aadhaar',
+              idNumber: cg.idNumber || '',
+              idDocumentUrl: cg.idDocumentUrl || '',
+            }))
+          : [],
+        roomRate: b.roomRate ?? 0,
+        extraBedCharge: b.extraBedCharge ?? 0,
+        otherCharges: b.otherCharges ?? 0,
+        discount: b.discount ?? 0,
+        source: b.source || 'reception',
+        notes: b.notes || '',
+      });
+    }
+  }, [open, b]);
+
+  const setField = (k) => (e) => setForm((prev) => ({ ...prev, [k]: e.target.value }));
+
+  const updateCoGuest = (idx, field, val) => {
+    setForm((prev) => {
+      const copy = [...prev.coGuests];
+      if (!copy[idx]) copy[idx] = { name: '', idType: 'Aadhaar', idNumber: '', idDocumentUrl: '' };
+      copy[idx] = { ...copy[idx], [field]: val };
+      return { ...prev, coGuests: copy };
+    });
   };
-  const m = useMutate((body) => bookingApi.update(b._id, body), { success: 'Booking updated', invalidate: inv, onSuccess: onClose });
-  const set = (k) => (e) => setV({ ...s, [k]: e.target.value });
+
+  const addCoGuest = () => {
+    setForm((prev) => ({
+      ...prev,
+      adults: Number(prev.adults || 1) + 1,
+      coGuests: [...prev.coGuests, { name: '', idType: 'Aadhaar', idNumber: '', idDocumentUrl: '' }],
+    }));
+  };
+
+  const removeCoGuest = (idx) => {
+    setForm((prev) => ({
+      ...prev,
+      adults: Math.max(1, Number(prev.adults || 1) - 1),
+      coGuests: prev.coGuests.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    setUploadingDoc(true);
+    try {
+      const res = await unwrap(api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }));
+      const urlStr = typeof res === 'string' ? res : res?.url || res?.data?.url || '';
+      setForm((prev) => ({ ...prev, idDocumentUrl: urlStr }));
+      toast.success('ID document uploaded successfully');
+    } catch (err) {
+      toast.error(errMsg(err, 'Failed to upload document'));
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleCoGuestFileUpload = async (idx, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    setUploadingCoDocs((prev) => ({ ...prev, [idx]: true }));
+    try {
+      const res = await unwrap(api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }));
+      const urlStr = typeof res === 'string' ? res : res?.url || res?.data?.url || '';
+      updateCoGuest(idx, 'idDocumentUrl', urlStr);
+      toast.success(`ID document uploaded for Co-Guest ${idx + 1}`);
+    } catch (err) {
+      toast.error(errMsg(err, 'Failed to upload document'));
+    } finally {
+      setUploadingCoDocs((prev) => ({ ...prev, [idx]: false }));
+    }
+  };
+
+  // Calculations for live preview
+  const nights = b?.nights || 1;
+  const numRate = Math.max(0, Number(form.roomRate) || 0);
+  const numExtra = Math.max(0, Number(form.extraBedCharge) || 0);
+  const numOther = Math.max(0, Number(form.otherCharges) || 0);
+  const numDisc = Math.max(0, Number(form.discount) || 0);
+  const roomTotal = numRate * nights;
+  const subtotal = roomTotal + numExtra + numOther;
+  const discountError = numDisc > subtotal ? 'Discount cannot exceed subtotal' : null;
+  const taxable = Math.max(0, subtotal - numDisc);
+  const taxPercent = b?.taxPercent || 0;
+  const tax = Math.round(taxable * (taxPercent / 100));
+  const newTotal = taxable + tax;
+  const paid = b?.paidAmount || 0;
+  const newBalance = Math.max(0, newTotal - paid);
+
+  const m = useMutate((body) => bookingApi.update(b._id, body), {
+    success: 'Booking details updated successfully',
+    invalidate: inv,
+    onSuccess: onClose,
+  });
+
+  const handleSave = () => {
+    if (!form.name.trim()) {
+      toast.error('Primary guest name is required');
+      setTab('guest');
+      return;
+    }
+    if (discountError) {
+      toast.error(discountError);
+      setTab('pricing');
+      return;
+    }
+
+    const payload = {
+      guest: {
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        address: form.address.trim(),
+        idType: form.idType,
+        idNumber: form.idNumber.trim(),
+        idDocumentUrl: form.idDocumentUrl,
+        nationality: form.nationality,
+      },
+      adults: Math.max(1, Number(form.adults) || 1),
+      children: Math.max(0, Number(form.children) || 0),
+      coGuests: form.coGuests.filter((cg) => cg.name && cg.name.trim()),
+      extraBedCharge: numExtra,
+      otherCharges: numOther,
+      discount: numDisc,
+      notes: form.notes,
+      source: form.source,
+      ...(can('bookings.edit_rate') ? { roomRate: numRate } : {}),
+    };
+
+    m.mutate(payload);
+  };
+
+  const tabs = [
+    { id: 'guest', label: 'Primary Guest', icon: User },
+    { id: 'party', label: `Party & Co-Guests (${form.adults}A, ${form.children}C)`, icon: Users },
+    { id: 'pricing', label: 'Rates & Pricing', icon: Receipt },
+    { id: 'notes', label: 'Source & Notes', icon: FileText },
+  ];
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Edit booking"
+      size="lg"
+      title={`Edit Total Booking • ${b?.bookingNumber || ''}`}
       footer={
-        <>
-          <button className="btn-ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="btn-primary"
-            disabled={m.isPending}
-            onClick={() =>
-              m.mutate({
-                adults: +s.adults,
-                children: +s.children,
-                extraBedCharge: +s.extraBedCharge,
-                otherCharges: +s.otherCharges,
-                discount: +s.discount,
-                notes: s.notes,
-                ...(can('bookings.edit_rate') && +s.roomRate !== b.roomRate ? { roomRate: +s.roomRate } : {}),
-              })
-            }
-          >
-            {m.isPending && <Spinner />}Save changes
-          </button>
-        </>
+        <div className="flex w-full items-center justify-between">
+          <div className="text-xs font-semibold text-slate-500 hidden sm:block">
+            Room <b className="text-slate-800">{b?.room?.roomNumber}</b> · {fmtDate(b?.checkInDate, 'dd MMM')} → {fmtDate(b?.checkOutDate, 'dd MMM')} ({nights} {nights === 1 ? 'night' : 'nights'})
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="btn-ghost" onClick={onClose} disabled={m.isPending}>
+              Cancel
+            </button>
+            <button className="btn-primary" disabled={m.isPending || !!discountError} onClick={handleSave}>
+              {m.isPending && <Spinner />}Save all changes
+            </button>
+          </div>
+        </div>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2">
-        {[
-          ['adults', 'Adults'],
-          ['children', 'Children'],
-          ['extraBedCharge', 'Extra bed'],
-          ['otherCharges', 'Other charges'],
-        ].map(([k, l]) => (
-          <Field key={k} label={l}>
-            <input type="number" min="0" className="input" value={s[k]} onChange={set(k)} />
-          </Field>
-        ))}
-        <Field label="Discount" hint={!can('bookings.give_discount') ? 'Admin permission required to give discounts.' : undefined}>
-          <input type="number" min="0" className="input" disabled={!can('bookings.give_discount')} value={s.discount} onChange={set('discount')} />
-        </Field>
-        <Field label="Room rate" hint={!can('bookings.edit_rate') ? 'Only managers can change the rate.' : undefined}>
-          <input type="number" className="input" disabled={!can('bookings.edit_rate')} value={s.roomRate} onChange={set('roomRate')} />
-        </Field>
-        <Field label="Notes" className="sm:col-span-2">
-          <textarea className="input" rows={2} value={s.notes} onChange={set('notes')} />
-        </Field>
+      <div className="space-y-4">
+        {/* Navigation Tabs */}
+        <div className="flex border-b border-slate-200 overflow-x-auto no-scrollbar gap-1">
+          {tabs.map((t) => {
+            const Icon = t.icon;
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                type="button"
+                className={`flex items-center gap-2 border-b-2 px-3.5 py-2.5 text-xs font-bold whitespace-nowrap transition-all ${
+                  active
+                    ? 'border-blue-600 text-blue-600 bg-blue-50/50 rounded-t-lg'
+                    : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'
+                }`}
+              >
+                <Icon className={`h-4 w-4 ${active ? 'text-blue-600' : 'text-slate-400'}`} />
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Tab 1: Primary Guest */}
+        {tab === 'guest' && (
+          <div className="space-y-4 pt-1">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Guest Full Name" required>
+                <div className="relative">
+                  <User className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    className="input pl-9"
+                    value={form.name}
+                    onChange={setField('name')}
+                    placeholder="e.g. Rahul Sharma"
+                    required
+                  />
+                </div>
+              </Field>
+
+              <Field label="Phone Number" required>
+                <div className="relative">
+                  <Phone className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="tel"
+                    className="input pl-9"
+                    value={form.phone}
+                    onChange={setField('phone')}
+                    placeholder="+91 9876543210"
+                    required
+                  />
+                </div>
+              </Field>
+
+              <Field label="Email Address">
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="email"
+                    className="input pl-9"
+                    value={form.email}
+                    onChange={setField('email')}
+                    placeholder="guest@example.com"
+                  />
+                </div>
+              </Field>
+
+              <Field label="Nationality">
+                <div className="relative">
+                  <Globe className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    className="input pl-9"
+                    value={form.nationality}
+                    onChange={setField('nationality')}
+                    placeholder="Indian"
+                  />
+                </div>
+              </Field>
+
+              <Field label="ID Proof Type">
+                <select className="input" value={form.idType} onChange={setField('idType')}>
+                  <option value="Aadhaar">Aadhaar Card</option>
+                  <option value="Passport">Passport</option>
+                  <option value="Driving License">Driving License</option>
+                  <option value="Voter ID">Voter ID</option>
+                  <option value="PAN Card">PAN Card</option>
+                  <option value="Other">Other ID</option>
+                </select>
+              </Field>
+
+              <Field label="ID Document Number">
+                <input
+                  type="text"
+                  className="input font-mono"
+                  value={form.idNumber}
+                  onChange={setField('idNumber')}
+                  placeholder="e.g. 1234 5678 9012"
+                />
+              </Field>
+
+              <Field label="Address / City" className="sm:col-span-2">
+                <div className="relative">
+                  <MapPin className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    className="input pl-9"
+                    value={form.address}
+                    onChange={setField('address')}
+                    placeholder="City, State, Country"
+                  />
+                </div>
+              </Field>
+
+              {/* ID Document Upload */}
+              <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4 text-blue-600" /> ID Document Attachment
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {form.idDocumentUrl ? 'ID document is attached.' : 'Upload guest Aadhaar/Passport photo or PDF scan.'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {form.idDocumentUrl && (
+                      <button
+                        type="button"
+                        onClick={() => openDocUrl(form.idDocumentUrl)}
+                        className="btn-ghost text-xs px-2.5 py-1.5 flex items-center gap-1 text-blue-600"
+                      >
+                        <Eye className="h-3.5 w-3.5" /> View Uploaded
+                      </button>
+                    )}
+                    <label className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5 cursor-pointer">
+                      {uploadingDoc ? <Spinner /> : <Upload className="h-3.5 w-3.5" />}
+                      <span>{form.idDocumentUrl ? 'Replace Document' : 'Upload ID'}</span>
+                      <input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleFileUpload} />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Party & Co-Guests */}
+        {tab === 'party' && (
+          <div className="space-y-4 pt-1">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Adults (Age 12+)">
+                <input
+                  type="number"
+                  min="1"
+                  className="input"
+                  value={form.adults}
+                  onChange={(e) => {
+                    const newAdults = Math.max(1, Number(e.target.value) || 1);
+                    setForm((prev) => {
+                      const needed = Math.max(0, newAdults - 1);
+                      const copy = [...prev.coGuests];
+                      while (copy.length < needed) copy.push({ name: '', idType: 'Aadhaar', idNumber: '', idDocumentUrl: '' });
+                      return { ...prev, adults: newAdults, coGuests: copy.slice(0, needed) };
+                    });
+                  }}
+                />
+              </Field>
+
+              <Field label="Children (Age 0-11)">
+                <input
+                  type="number"
+                  min="0"
+                  className="input"
+                  value={form.children}
+                  onChange={setField('children')}
+                />
+              </Field>
+            </div>
+
+            {/* Co-guests list */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-blue-600" /> Additional Co-Guests ({form.coGuests.length})
+                </h4>
+                <button
+                  type="button"
+                  onClick={addCoGuest}
+                  className="btn-ghost text-xs px-2.5 py-1 text-blue-600 font-bold flex items-center gap-1"
+                >
+                  <UserPlus className="h-3.5 w-3.5" /> + Add Co-Guest
+                </button>
+              </div>
+
+              {!form.coGuests.length ? (
+                <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
+                  No additional co-guests registered. Click "+ Add Co-Guest" or increase Adults to add party members.
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+                  {form.coGuests.map((cg, idx) => (
+                    <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800">Co-Guest #{idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeCoGuest(idx)}
+                          className="text-rose-500 hover:text-rose-700 text-xs flex items-center gap-1 font-semibold"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Remove
+                        </button>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <input
+                          className="input text-xs"
+                          placeholder="Full Name"
+                          value={cg.name}
+                          onChange={(e) => updateCoGuest(idx, 'name', e.target.value)}
+                        />
+                        <select
+                          className="input text-xs"
+                          value={cg.idType}
+                          onChange={(e) => updateCoGuest(idx, 'idType', e.target.value)}
+                        >
+                          <option value="Aadhaar">Aadhaar</option>
+                          <option value="Passport">Passport</option>
+                          <option value="Driving License">Driving License</option>
+                          <option value="Voter ID">Voter ID</option>
+                          <option value="Other">Other</option>
+                        </select>
+                        <input
+                          className="input text-xs"
+                          placeholder="ID Number"
+                          value={cg.idNumber}
+                          onChange={(e) => updateCoGuest(idx, 'idNumber', e.target.value)}
+                        />
+                      </div>
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        {cg.idDocumentUrl && (
+                          <button
+                            type="button"
+                            onClick={() => openDocUrl(cg.idDocumentUrl)}
+                            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <Eye className="h-3 w-3" /> View ID Document
+                          </button>
+                        )}
+                        <label className="btn-secondary text-[11px] px-2.5 py-1 flex items-center gap-1 cursor-pointer">
+                          {uploadingCoDocs[idx] ? <Spinner /> : <Upload className="h-3 w-3" />}
+                          <span>{cg.idDocumentUrl ? 'Replace ID' : 'Upload ID'}</span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*,application/pdf"
+                            onChange={(e) => handleCoGuestFileUpload(idx, e)}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 3: Rates & Pricing */}
+        {tab === 'pricing' && (
+          <div className="space-y-4 pt-1">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label="Room Rate (₹ / night)"
+                hint={!can('bookings.edit_rate') ? 'Admin or Manager permission required to alter room rate.' : undefined}
+              >
+                <input
+                  type="number"
+                  min="0"
+                  className="input font-bold"
+                  disabled={!can('bookings.edit_rate')}
+                  value={form.roomRate}
+                  onChange={setField('roomRate')}
+                />
+              </Field>
+
+              <Field label="Extra Bed Charge (₹)">
+                <input
+                  type="number"
+                  min="0"
+                  className="input"
+                  value={form.extraBedCharge}
+                  onChange={setField('extraBedCharge')}
+                />
+              </Field>
+
+              <Field label="Other Charges / Services (₹)">
+                <input
+                  type="number"
+                  min="0"
+                  className="input"
+                  value={form.otherCharges}
+                  onChange={setField('otherCharges')}
+                />
+              </Field>
+
+              <Field
+                label="Discount (₹)"
+                hint={!can('bookings.give_discount') ? 'Admin permission required to give discounts.' : undefined}
+                error={discountError}
+              >
+                <input
+                  type="number"
+                  min="0"
+                  className="input"
+                  disabled={!can('bookings.give_discount')}
+                  value={form.discount}
+                  onChange={setField('discount')}
+                />
+              </Field>
+            </div>
+
+            {/* Live Financial Breakdown Card */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-2 text-xs">
+              <div className="flex items-center justify-between font-bold text-slate-800 border-b border-slate-200 pb-2">
+                <span>Calculated Financial Breakdown</span>
+                <span className="text-slate-500 font-normal">{nights} {nights === 1 ? 'Night' : 'Nights'} Stay</span>
+              </div>
+              <Row k={`Room Charges (${money(numRate)} × ${nights} nights)`} v={money(roomTotal)} />
+              {numExtra > 0 && <Row k="Extra Bed" v={money(numExtra)} />}
+              {numOther > 0 && <Row k="Other Charges" v={money(numOther)} />}
+              <Row k="Subtotal" v={money(subtotal)} strong />
+              {numDisc > 0 && (
+                <div className="flex justify-between text-emerald-700 font-bold">
+                  <span>Discount</span>
+                  <span>- {money(numDisc)}</span>
+                </div>
+              )}
+              {taxPercent > 0 && <Row k={`Tax (${taxPercent}%)`} v={money(tax)} />}
+              <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-black text-slate-900">
+                <span>Total Amount</span>
+                <span>{money(newTotal)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Amount Paid</span>
+                <span className="font-bold">{money(paid)}</span>
+              </div>
+              <div className={`flex justify-between text-sm font-black ${newBalance > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                <span>{newBalance > 0 ? 'Balance Pending' : 'Fully Paid'}</span>
+                <span>{money(newBalance)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 4: Source & Notes */}
+        {tab === 'notes' && (
+          <div className="space-y-4 pt-1">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Booking Source">
+                <select className="input capitalize" value={form.source} onChange={setField('source')}>
+                  <option value="reception">Reception / Desk</option>
+                  <option value="walk_in">Walk-in Guest</option>
+                  <option value="phone">Phone Booking</option>
+                  <option value="other">Other / Online</option>
+                </select>
+              </Field>
+            </div>
+
+            <Field label="Special Requests & Internal Notes" hint="Visible across Reception, Front Desk and Invoices.">
+              <textarea
+                className="input"
+                rows={4}
+                value={form.notes}
+                onChange={setField('notes')}
+                placeholder="e.g. Early check-in requested, high floor preference, airport taxi required..."
+              />
+            </Field>
+          </div>
+        )}
       </div>
     </Modal>
   );
