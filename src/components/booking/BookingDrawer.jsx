@@ -40,6 +40,7 @@ import { useCan } from '../../store/auth';
 import { useMutate } from '../../hooks/useMutate';
 import { toast } from '../../store/toast';
 import { Drawer, Modal, Badge, Field, Spinner, ErrorState, Skeleton } from '../common/ui';
+import { CheckInModal } from './CheckInModal';
 import { fmtDate, fmtDateTime, money, iso, utcDate, addDays } from '../../utils/format';
 
 const KEYS = ['calendar', 'bookings', 'dashboard', 'arrivals', 'departures', 'payments', 'rooms', 'availability'];
@@ -332,12 +333,11 @@ export default function BookingDrawer() {
                 )}
                 {['hold', 'confirmed'].includes(b.bookingStatus) && can('checkin.perform') && (
                   <button
-                    onClick={() => checkIn.mutate()}
-                    disabled={checkIn.isPending}
+                    onClick={() => setModal('checkin')}
                     className="flex items-center justify-between rounded-xl bg-emerald-600 p-3 text-xs font-bold text-white hover:bg-emerald-700 shadow-xs transition-colors"
                   >
                     <span className="flex items-center gap-2">
-                      {checkIn.isPending ? <Spinner /> : <LogIn className="h-4 w-4" />} Check in
+                      <LogIn className="h-4 w-4" /> Check in
                     </span>
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -406,6 +406,7 @@ export default function BookingDrawer() {
             </div>
 
             {/* Modals */}
+            <CheckInModal open={modal === 'checkin'} b={b} onClose={done} inv={inv} />
             <EditModal open={modal === 'edit'} b={b} onClose={done} inv={inv} />
             <ExtendModal open={modal === 'extend'} b={b} onClose={done} inv={inv} />
             <RoomModal open={modal === 'room'} b={b} onClose={done} inv={inv} />

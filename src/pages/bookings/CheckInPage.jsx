@@ -23,10 +23,12 @@ import { bookingApi } from '../../services/booking.api';
 import { useMutate } from '../../hooks/useMutate';
 import { useUI } from '../../store/ui';
 import { Card, QueryBoundary, Badge, Spinner, EmptyState, cx } from '../../components/common/ui';
+import { CheckInModal } from '../../components/booking/CheckInModal';
 import { money, fmtDate } from '../../utils/format';
 
 export default function CheckInPage() {
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [checkInModalBooking, setCheckInModalBooking] = useState(null);
   const [filterFloor, setFilterFloor] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -270,7 +272,7 @@ export default function CheckInPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            go.mutate(b._id);
+                            setCheckInModalBooking(b);
                           }}
                           className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 sm:py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-xs min-h-[40px]"
                         >
@@ -279,7 +281,7 @@ export default function CheckInPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            openBookingDrawer(b._id);
+                            setCheckInModalBooking(b);
                           }}
                           className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 sm:py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors min-h-[40px]"
                         >
@@ -486,11 +488,10 @@ export default function CheckInPage() {
                     <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit Booking
                   </button>
                   <button
-                    onClick={() => go.mutate(activeGuest._id)}
-                    disabled={go.isPending}
+                    onClick={() => setCheckInModalBooking(activeGuest)}
                     className="btn-primary flex-1 rounded-xl text-xs font-extrabold py-2.5 bg-blue-600 hover:bg-blue-700 shadow-md"
                   >
-                    {go.isPending ? <Spinner /> : <LogIn className="h-3.5 w-3.5 mr-1" />} Complete Check-in
+                    <LogIn className="h-3.5 w-3.5 mr-1" /> Complete Check-in
                   </button>
                 </div>
               </div>
@@ -500,6 +501,13 @@ export default function CheckInPage() {
           )}
         </div>
       </div>
+
+      <CheckInModal
+        open={!!checkInModalBooking}
+        b={checkInModalBooking}
+        onClose={() => setCheckInModalBooking(null)}
+        inv={['arrivals', 'calendar', 'dashboard', 'bookings', 'rooms']}
+      />
     </div>
   );
 }
