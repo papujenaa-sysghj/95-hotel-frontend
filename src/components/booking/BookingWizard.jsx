@@ -113,7 +113,9 @@ function WizardInner({ opts, onClose, onDone }) {
 
   const nights = Math.max(0, differenceInCalendarDays(parseISO(v.checkOutDate || t), parseISO(v.checkInDate || t)));
   const settings = useQuery({ queryKey: ['settings'], queryFn: () => unwrap(api.get('/settings')), staleTime: 300000 });
-  const taxPercent = settings.data?.hotel?.booking?.taxPercent ?? 0;
+  const [applyTax, setApplyTax] = useState(true);
+  const hotelTax = settings.data?.hotel?.booking?.taxPercent ?? 12;
+  const taxPercent = applyTax ? hotelTax : 0;
   const totals = useMemo(() => calcTotals({ ...v, roomRate: Number(v.roomRate), nights, taxPercent, discount: Number(v.discount) }), [v.roomRate, v.extraBedCharge, v.otherCharges, v.discount, nights, taxPercent]);
 
   const avail = useQuery({
@@ -144,7 +146,7 @@ function WizardInner({ opts, onClose, onDone }) {
       coGuests: validCoGuests,
       room: room._id, checkInDate: v.checkInDate, checkOutDate: v.checkOutDate, adults: Number(v.adults), children: Number(v.children),
       ...(can('bookings.edit_rate') ? { roomRate: Number(v.roomRate) } : {}),
-      extraBedCharge: Number(v.extraBedCharge), otherCharges: Number(v.otherCharges), discount: Number(v.discount), source: walkIn ? 'walk_in' : 'reception', notes: v.notes || undefined,
+      extraBedCharge: Number(v.extraBedCharge), otherCharges: Number(v.otherCharges), discount: Number(v.discount), taxPercent, source: walkIn ? 'walk_in' : 'reception', notes: v.notes || undefined,
       checkInNow: v.checkInNow && v.checkInDate === t, ...(amt > 0 && { payment: { amount: amt, method: v.payMethod } })
     });
   };
@@ -690,6 +692,32 @@ function WizardInner({ opts, onClose, onDone }) {
           <Field label="Notes">
             <input className="input" placeholder="Optional notes" {...f.register('notes')} />
           </Field>
+          <div className="sm:col-span-2 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/90 p-3.5 shadow-2xs">
+            <label htmlFor="wizardApplyTax" className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                id="wizardApplyTax"
+                checked={applyTax}
+                onChange={(e) => setApplyTax(e.target.checked)}
+                className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <div>
+                <p className="text-xs font-bold text-slate-900">Apply {hotelTax}% GST / Tax (Optional)</p>
+                <p className="text-[11px] text-slate-500">Tick to include {hotelTax}% tax, or untick to make booking tax-free (0%).</p>
+              </div>
+            </label>
+            <button
+              type="button"
+              onClick={() => setApplyTax(!applyTax)}
+              className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all ${
+                applyTax
+                  ? 'bg-blue-50 border-blue-200 text-blue-700'
+                  : 'bg-slate-100 border-slate-200 text-slate-500'
+              }`}
+            >
+              {applyTax ? `✓ ${hotelTax}% Tax Active` : '✕ No Tax (0%)'}
+            </button>
+          </div>
           <Totals totals={totals} taxPercent={taxPercent} className="sm:col-span-2" />
         </div>
       )}

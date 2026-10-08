@@ -464,9 +464,13 @@ function EditModal({ open, b, onClose, inv }) {
     notes: '',
   });
 
+  const [applyTax, setApplyTax] = useState(true);
+
   useEffect(() => {
     if (open && b) {
       setTab('guest');
+      const hasTax = (b.taxPercent ?? 12) > 0;
+      setApplyTax(hasTax);
       setForm({
         name: b.guest?.name || '',
         phone: b.guest?.phone || '',
@@ -490,6 +494,7 @@ function EditModal({ open, b, onClose, inv }) {
         extraBedCharge: b.extraBedCharge ?? 0,
         otherCharges: b.otherCharges ?? 0,
         discount: b.discount ?? 0,
+        taxPercent: b.taxPercent ?? 12,
         source: b.source || 'reception',
         notes: b.notes || '',
       });
@@ -569,8 +574,8 @@ function EditModal({ open, b, onClose, inv }) {
   const subtotal = roomTotal + numExtra + numOther;
   const discountError = numDisc > subtotal ? 'Discount cannot exceed subtotal' : null;
   const taxable = Math.max(0, subtotal - numDisc);
-  const taxPercent = b?.taxPercent || 0;
-  const tax = Math.round(taxable * (taxPercent / 100));
+  const activeTaxPercent = applyTax ? (Number(form.taxPercent) || 12) : 0;
+  const tax = Math.round(taxable * (activeTaxPercent / 100));
   const newTotal = taxable + tax;
   const paid = b?.paidAmount || 0;
   const newBalance = Math.max(0, newTotal - paid);
@@ -610,6 +615,7 @@ function EditModal({ open, b, onClose, inv }) {
       extraBedCharge: numExtra,
       otherCharges: numOther,
       discount: numDisc,
+      taxPercent: activeTaxPercent,
       notes: form.notes,
       source: form.source,
       ...(can('bookings.edit_rate') ? { roomRate: numRate } : {}),
@@ -970,6 +976,34 @@ function EditModal({ open, b, onClose, inv }) {
               </Field>
             </div>
 
+            {/* Optional 12% Tax Toggle */}
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/90 p-3.5 shadow-2xs">
+              <label htmlFor="editApplyTaxToggle" className="flex items-center gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  id="editApplyTaxToggle"
+                  checked={applyTax}
+                  onChange={(e) => setApplyTax(e.target.checked)}
+                  className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+                <div>
+                  <p className="text-xs font-bold text-slate-900">Apply 12% GST / Tax (Optional)</p>
+                  <p className="text-[11px] text-slate-500">Tick to calculate 12% tax, or untick to make stay tax-free (0%).</p>
+                </div>
+              </label>
+              <button
+                type="button"
+                onClick={() => setApplyTax(!applyTax)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all ${
+                  applyTax
+                    ? 'bg-blue-50 border-blue-200 text-blue-700'
+                    : 'bg-slate-100 border-slate-200 text-slate-500'
+                }`}
+              >
+                {applyTax ? '✓ 12% Tax Active' : '✕ No Tax (0%)'}
+              </button>
+            </div>
+
             {/* Live Financial Breakdown Card */}
             <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-2 text-xs">
               <div className="flex items-center justify-between font-bold text-slate-800 border-b border-slate-200 pb-2">
@@ -986,7 +1020,14 @@ function EditModal({ open, b, onClose, inv }) {
                   <span>- {money(numDisc)}</span>
                 </div>
               )}
-              {taxPercent > 0 && <Row k={`Tax (${taxPercent}%)`} v={money(tax)} />}
+              {activeTaxPercent > 0 ? (
+                <Row k={`Tax (${activeTaxPercent}%)`} v={money(tax)} />
+              ) : (
+                <div className="flex justify-between text-slate-400">
+                  <span>Tax (0% - Exempt)</span>
+                  <span>₹0</span>
+                </div>
+              )}
               <div className="border-t border-slate-200 pt-2 flex justify-between text-sm font-black text-slate-900">
                 <span>Total Amount</span>
                 <span>{money(newTotal)}</span>
