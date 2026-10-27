@@ -131,7 +131,7 @@ export default function MonthlyCalendarContent({
           // Hotel night logic: occupied on [inDate, outDate)
           if (dateStr >= inDate && dateStr < outDate) {
             occupiedCount++;
-            dailyEstRevenue += (b.roomRate || room.basePrice || 2500);
+            dailyEstRevenue += (b.roomRate || room.basePrice || 0);
           }
         });
       });

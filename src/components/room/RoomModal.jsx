@@ -64,7 +64,7 @@ export default function RoomModal({ open, onClose, roomToEdit = null, defaultFlo
         setFloor(defaultFloor || 1);
         const defaultType = roomTypes[0]?._id || '';
         setRoomType(defaultType);
-        setBasePrice(roomTypes[0]?.basePrice || 2500);
+        setBasePrice(roomTypes[0]?.basePrice || '');
         setIsAC(true);
         setBedType('King Bed');
         setStandardCapacity(2);
@@ -83,7 +83,7 @@ export default function RoomModal({ open, onClose, roomToEdit = null, defaultFlo
     const selected = roomTypes.find((t) => t._id === typeId);
     if (selected) {
       if (!isEditing || !basePrice) {
-        setBasePrice(selected.basePrice || 2500);
+        setBasePrice(selected.basePrice || '');
       }
       if (selected.acAvailable !== undefined) {
         setIsAC(selected.acAvailable);

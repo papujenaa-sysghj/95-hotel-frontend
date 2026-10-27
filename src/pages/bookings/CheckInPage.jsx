@@ -53,8 +53,8 @@ export default function CheckInPage() {
     setChecklist({ id: false, pay: false, room: false, sign: false });
   }, [activeGuest?._id]);
 
-  const totalPendingPay = pendingArrivals.reduce((sum, b) => sum + (b.balanceAmount || 10080), 0) || 16800;
-  const readyRoomsCount = pendingArrivals.filter((b) => ['clean', 'inspected'].includes(b.room?.housekeepingStatus)).length || 2;
+  const totalPendingPay = pendingArrivals.reduce((sum, b) => sum + (b.balanceAmount || 0), 0);
+  const readyRoomsCount = pendingArrivals.filter((b) => ['clean', 'inspected'].includes(b.room?.housekeepingStatus)).length;
 
   const toggleChecklist = (key) => setChecklist((prev) => ({ ...prev, [key]: !prev[key] }));
   const checklistCount = Object.values(checklist).filter(Boolean).length;
@@ -79,7 +79,7 @@ export default function CheckInPage() {
           </div>
           <div>
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Arrivals Today</p>
-            <p className="text-2xl font-black text-slate-900 leading-none my-0.5">{pendingArrivals.length || 2}</p>
+            <p className="text-2xl font-black text-slate-900 leading-none my-0.5">{pendingArrivals.length}</p>
             <p className="text-[10px] font-semibold text-slate-400">Expected to arrive</p>
           </div>
         </div>
@@ -113,7 +113,7 @@ export default function CheckInPage() {
           <div>
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pending Payment</p>
             <p className="text-2xl font-black text-slate-900 leading-none my-0.5">{money(totalPendingPay)}</p>
-            <p className="text-[10px] font-semibold text-slate-400">{pendingArrivals.length || 2} guests</p>
+            <p className="text-[10px] font-semibold text-slate-400">{pendingArrivals.length} guests</p>
           </div>
         </div>
       </div>
@@ -122,7 +122,7 @@ export default function CheckInPage() {
       <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-2xs">
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-700">
           <CalendarIcon className="h-3.5 w-3.5 text-slate-500" />
-          <span>20 Sep 2026</span>
+          <span>{fmtDate(new Date(), 'dd MMM yyyy')}</span>
         </div>
 
         <select
@@ -412,9 +412,9 @@ export default function CheckInPage() {
                     <div className="space-y-1 text-slate-600">
                       <p><span className="text-slate-400">Check-in:</span> <b className="text-slate-800">{fmtDate(activeGuest.checkInDate, 'dd MMM yyyy')}</b></p>
                       <p><span className="text-slate-400">Check-out:</span> <b className="text-slate-800">{fmtDate(activeGuest.checkOutDate, 'dd MMM yyyy')}</b></p>
-                      <p><span className="text-slate-400">Nights:</span> <b className="text-slate-800">{activeGuest.nights || 3}</b></p>
-                      <p><span className="text-slate-400">Adults:</span> <b className="text-slate-800">{activeGuest.adults || 2}</b></p>
-                      <p><span className="text-slate-400">Children:</span> <b className="text-slate-800">{activeGuest.children || 0}</b></p>
+                      <p><span className="text-slate-400">Nights:</span> <b className="text-slate-800">{activeGuest.nights ?? 1}</b></p>
+                      <p><span className="text-slate-400">Adults:</span> <b className="text-slate-800">{activeGuest.adults ?? 1}</b></p>
+                      <p><span className="text-slate-400">Children:</span> <b className="text-slate-800">{activeGuest.children ?? 0}</b></p>
                     </div>
                   </div>
 
