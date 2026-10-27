@@ -17,10 +17,15 @@ export default function AdminDashboard() {
   const [statusDate, setStatusDate] = useState(todayStr);
   const [overviewFilter, setOverviewFilter] = useState('all');
   const [range, setRange] = useState('7');
+  const [revRange, setRevRange] = useState('7');
   const q = useQuery({ queryKey: ['dashboard', statusDate], queryFn: () => dashboardApi.summary({ date: statusDate }), refetchInterval: 60000 });
   const days = Number(range);
+  const revDays = Number(revRange);
   const occ = useQuery({ queryKey: ['dashboard', 'occ', days], queryFn: () => dashboardApi.occupancy(days) });
-  const rev = useQuery({ queryKey: ['dashboard', 'rev', 'day'], queryFn: () => dashboardApi.revenue({ group: 'day', from: new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10) }) });
+  const rev = useQuery({ 
+    queryKey: ['dashboard', 'rev', 'day', revDays], 
+    queryFn: () => dashboardApi.revenue({ group: 'day', from: new Date(Date.now() - revDays * 864e5).toISOString().slice(0, 10) }) 
+  });
 
   const s = q.data?.stats;
 
@@ -30,17 +35,33 @@ export default function AdminDashboard() {
 
   const occSeries = useMemo(() => {
     const x = occ.data?.series || [];
-    return x.map((d) => ({ label: d.date.slice(5), rate: d.rate }));
-  }, [occ.data]);
+    if (x.length) return x.map((d) => ({ label: d.date.slice(5), rate: d.rate }));
+    const result = [];
+    const now = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 864e5);
+      result.push({ label: d.toISOString().slice(5, 10), rate: 0 });
+    }
+    return result;
+  }, [occ.data, days]);
 
   const revSeries = useMemo(() => {
     const x = rev.data?.series || [];
-    return x.map((d) => ({
-      period: d.period.slice(5),
-      roomRevenue: d.collected || 0,
-      otherRevenue: 0,
-    }));
-  }, [rev.data]);
+    if (x.length) {
+      return x.map((d) => ({
+        period: d.period.slice(5),
+        roomRevenue: d.collected || 0,
+        otherRevenue: 0,
+      }));
+    }
+    const result = [];
+    const now = new Date();
+    for (let i = revDays - 1; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 864e5);
+      result.push({ period: d.toISOString().slice(5, 10), roomRevenue: 0, otherRevenue: 0 });
+    }
+    return result;
+  }, [rev.data, revDays]);
 
   const roomTypesData = useMemo(() => {
     if (!q.data?.roomTypeOccupancy?.length) return [];
@@ -82,7 +103,7 @@ export default function AdminDashboard() {
         <Stat
           loading={q.isLoading}
           label="Total Rooms"
-          value={s?.totalRooms || 50}
+          value={s?.totalRooms ?? 0}
           hint="All rooms"
           icon={BedDouble}
           tone="bg-blue-50 text-blue-600"
@@ -90,40 +111,40 @@ export default function AdminDashboard() {
         <Stat
           loading={q.isLoading}
           label="Available"
-          value={s?.available || 42}
-          hint={`${Math.round(((s?.available || 42) / (s?.totalRooms || 50)) * 100)}% Ready for booking`}
+          value={s?.available ?? 0}
+          hint={`${s?.totalRooms ? Math.round(((s.available ?? 0) / s.totalRooms) * 100) : 0}% Ready for booking`}
           icon={DoorOpen}
           tone="bg-emerald-50 text-emerald-600"
         />
         <Stat
           loading={q.isLoading}
           label="Occupied"
-          value={s?.occupied || 6}
-          hint={`${Math.round(((s?.occupied || 6) / (s?.totalRooms || 50)) * 100)}% Currently in use`}
+          value={s?.occupied ?? 0}
+          hint={`${s?.totalRooms ? Math.round(((s.occupied ?? 0) / s.totalRooms) * 100) : 0}% Currently in use`}
           icon={DoorClosed}
           tone="bg-blue-50 text-blue-600"
         />
         <Stat
           loading={q.isLoading}
           label="Maintenance"
-          value={s?.maintenance || 1}
-          hint={`${Math.round(((s?.maintenance || 1) / (s?.totalRooms || 50)) * 100)}% Under maintenance`}
+          value={s?.maintenance ?? 0}
+          hint={`${s?.totalRooms ? Math.round(((s.maintenance ?? 0) / s.totalRooms) * 100) : 0}% Under maintenance`}
           icon={Wrench}
           tone="bg-orange-50 text-orange-600"
         />
         <Stat
           loading={q.isLoading}
           label="Out of Service"
-          value={s?.outOfService || 1}
-          hint={`${Math.round(((s?.outOfService || 1) / (s?.totalRooms || 50)) * 100)}% Not bookable`}
+          value={s?.outOfService ?? 0}
+          hint={`${s?.totalRooms ? Math.round(((s.outOfService ?? 0) / s.totalRooms) * 100) : 0}% Not bookable`}
           icon={Ban}
           tone="bg-rose-50 text-rose-600"
         />
         <Stat
           loading={q.isLoading}
           label="Today's Revenue"
-          value={money(s?.todayRevenue || 19560)}
-          hint="+12% 6 bookings"
+          value={money(s?.todayRevenue ?? 0)}
+          hint={`${s?.todayCheckIns ?? 0} check-ins today`}
           icon={IndianRupee}
           tone="bg-purple-50 text-purple-600"
         />
@@ -138,7 +159,7 @@ export default function AdminDashboard() {
             <select
               value={range}
               onChange={(e) => setRange(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-600 outline-none"
+              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-600 outline-none cursor-pointer"
             >
               <option value="7">Last 7 Days</option>
               <option value="30">Last 30 Days</option>
@@ -147,18 +168,12 @@ export default function AdminDashboard() {
         >
           <div className="mb-2 flex items-baseline gap-2">
             <span className="text-2xl font-extrabold text-slate-900">{occRate}%</span>
-            <span className="inline-flex items-center gap-0.5 text-xs font-bold text-emerald-600">
-              <TrendingUp className="h-3.5 w-3.5" /> 12%
-            </span>
             <span className="text-xs text-slate-400">Average occupancy rate</span>
           </div>
           <QueryBoundary q={occ} skeleton={<Skeleton className="h-48" />}>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={occSeries.length ? occSeries : [
-                  { label: '14 Sep', rate: 45 }, { label: '15 Sep', rate: 48 }, { label: '16 Sep', rate: 65 },
-                  { label: '17 Sep', rate: 70 }, { label: '18 Sep', rate: 72 }, { label: '19 Sep', rate: 75 }, { label: '20 Sep', rate: 80 }
-                ]}>
+                <AreaChart data={occSeries}>
                   <defs>
                     <linearGradient id="occGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#2563EB" stopOpacity={0.3} />
@@ -180,17 +195,18 @@ export default function AdminDashboard() {
         <Card
           title="Revenue Overview"
           action={
-            <select className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-600 outline-none">
-              <option>Last 7 Days</option>
-              <option>Last 30 Days</option>
+            <select
+              value={revRange}
+              onChange={(e) => setRevRange(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-600 outline-none cursor-pointer"
+            >
+              <option value="7">Last 7 Days</option>
+              <option value="30">Last 30 Days</option>
             </select>
           }
         >
           <div className="mb-2 flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold text-slate-900">{money(rev.data?.totalRevenue || 124350)}</span>
-            <span className="inline-flex items-center gap-0.5 text-xs font-bold text-emerald-600">
-              <TrendingUp className="h-3.5 w-3.5" /> 18%
-            </span>
+            <span className="text-2xl font-extrabold text-slate-900">{money(rev.data?.totalRevenue ?? 0)}</span>
             <span className="text-xs text-slate-400">Total revenue</span>
           </div>
           <div className="mb-2 flex items-center gap-4 text-xs font-semibold">
@@ -200,15 +216,7 @@ export default function AdminDashboard() {
           <QueryBoundary q={rev} skeleton={<Skeleton className="h-44" />}>
             <div className="h-44">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={revSeries.length ? revSeries : [
-                  { period: '14 Sep', roomRevenue: 18000, otherRevenue: 4500 },
-                  { period: '15 Sep', roomRevenue: 22000, otherRevenue: 5000 },
-                  { period: '16 Sep', roomRevenue: 24000, otherRevenue: 6000 },
-                  { period: '17 Sep', roomRevenue: 28000, otherRevenue: 7000 },
-                  { period: '18 Sep', roomRevenue: 27000, otherRevenue: 6500 },
-                  { period: '19 Sep', roomRevenue: 29000, otherRevenue: 7500 },
-                  { period: '20 Sep', roomRevenue: 30000, otherRevenue: 8000 },
-                ]}>
+                <BarChart data={revSeries}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                   <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={(v) => `${v / 1000}K`} axisLine={false} tickLine={false} />
@@ -333,7 +341,7 @@ export default function AdminDashboard() {
 
           {/* Today's Arrivals */}
           <Card
-            title={`Today's Arrivals (${q.data?.arrivals?.length || 2})`}
+            title={`Today's Arrivals (${q.data?.arrivals?.length ?? 0})`}
             action={
               <Link to="/check-in" className="text-xs font-bold text-blue-600 hover:text-blue-700">
                 View All
@@ -348,7 +356,7 @@ export default function AdminDashboard() {
 
           {/* Today's Departures */}
           <Card
-            title={`Today's Departures (${q.data?.departures?.length || 0})`}
+            title={`Today's Departures (${q.data?.departures?.length ?? 0})`}
             action={
               <Link to="/check-out" className="text-xs font-bold text-blue-600 hover:text-blue-700">
                 View All
