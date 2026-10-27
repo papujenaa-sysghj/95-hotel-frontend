@@ -172,7 +172,7 @@ export default function CheckInPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-base font-extrabold text-slate-900">🔀 Today's Arrivals ({pendingArrivals.length || 2})</span>
+                <span className="text-base font-extrabold text-slate-900">🔀 Today's Arrivals ({pendingArrivals.length})</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-500">
                 <span className="font-semibold">Sort by</span>
@@ -183,220 +183,197 @@ export default function CheckInPage() {
             </div>
 
             <QueryBoundary q={q} isEmpty={false}>
-              <div className="space-y-3.5">
-                {(pendingArrivals.length
-                  ? pendingArrivals
-                  : [
-                      {
-                        _id: 'b1',
-                        bookingNumber: 'BK-2026-000003',
-                        guest: { name: 'Vikram Singh', phone: '+91 98765 43210', email: 'vikram@example.com', idType: 'Aadhaar' },
-                        room: { roomNumber: '107', floor: 1, roomType: { name: 'Deluxe (AC)' } },
-                        checkInDate: '2026-09-20',
-                        checkOutDate: '2026-09-23',
-                        nights: 3,
-                        bookingStatus: 'checked_in',
-                        balanceAmount: 10080,
-                      },
-                      {
-                        _id: 'b2',
-                        bookingNumber: 'BK-2026-000007',
-                        guest: { name: 'Arjun Mehta', phone: '+91 87654 32109', email: 'arjun@example.com', idType: 'Aadhaar' },
-                        room: { roomNumber: '204', floor: 2, roomType: { name: 'Standard' } },
-                        checkInDate: '2026-09-20',
-                        checkOutDate: '2026-09-22',
-                        nights: 2,
-                        bookingStatus: 'checked_in',
-                        balanceAmount: 6720,
-                      },
-                    ]
-                ).map((b) => {
-                  const isSelected = activeGuest?._id === b._id;
-                  const avatarBg = b.bookingNumber.endsWith('3') ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700';
+              {pendingArrivals.length === 0 ? (
+                <EmptyState
+                  icon="🔀"
+                  title="No arrivals pending today"
+                  description="There are no pending check-ins scheduled for today."
+                />
+              ) : (
+                <div className="space-y-3.5">
+                  {pendingArrivals.map((b) => {
+                    const isSelected = activeGuest?._id === b._id;
+                    const avatarBg = b.bookingNumber?.endsWith('3') ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700';
 
-                  return (
-                    <div
-                      key={b._id}
-                      onClick={() => setSelectedBooking(b)}
-                      className={cx(
-                        'flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border p-5 transition-all cursor-pointer bg-white shadow-2xs',
-                        isSelected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300'
-                      )}
-                    >
-                      {/* Left: Guest Info */}
-                      <div className="flex items-center gap-3.5 min-w-[200px]">
-                        <div className={cx('grid h-12 w-12 shrink-0 place-items-center rounded-full text-sm font-black', avatarBg)}>
-                          {b.guest?.name ? b.guest.name.split(' ').map((n) => n[0]).slice(0, 2).join('') : 'VS'}
+                    return (
+                      <div
+                        key={b._id}
+                        onClick={() => setSelectedBooking(b)}
+                        className={cx(
+                          'flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border p-5 transition-all cursor-pointer bg-white shadow-2xs',
+                          isSelected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300'
+                        )}
+                      >
+                        {/* Left: Guest Info */}
+                        <div className="flex items-center gap-3.5 min-w-[200px]">
+                          <div className={cx('grid h-12 w-12 shrink-0 place-items-center rounded-full text-sm font-black', avatarBg)}>
+                            {b.guest?.name ? b.guest.name.split(' ').map((n) => n[0]).slice(0, 2).join('') : 'G'}
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-bold text-slate-400">{b.bookingNumber}</p>
+                            <h3 className="text-base font-extrabold text-slate-900 leading-tight">{b.guest?.name || 'Guest'}</h3>
+                            {b.guest?.phone && (
+                              <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                                <Phone className="h-3 w-3 text-slate-400" /> {b.guest.phone}
+                              </p>
+                            )}
+                            {b.guest?.email && (
+                              <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                                <Mail className="h-3 w-3 text-slate-400" /> {b.guest.email}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-[11px] font-bold text-slate-400">{b.bookingNumber}</p>
-                          <h3 className="text-base font-extrabold text-slate-900 leading-tight">{b.guest?.name}</h3>
-                          <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                            <Phone className="h-3 w-3 text-slate-400" /> {b.guest?.phone || '+91 98765 43210'}
+
+                        {/* Middle: Room Info */}
+                        <div className="space-y-1 sm:border-l border-slate-100 sm:pl-4">
+                          <div className="flex items-center gap-2">
+                            <BedDouble className="h-4 w-4 text-blue-600" />
+                            <span className="font-black text-slate-900 text-sm">Room {b.room?.roomNumber || '—'}</span>
+                          </div>
+                          <p className="text-xs font-extrabold text-slate-600">{b.room?.roomType?.name || 'Standard'}</p>
+                          {b.room?.floor && (
+                            <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                              Floor {b.room.floor}
+                            </span>
+                          )}
+                          <p className="text-xs font-semibold text-slate-500 mt-1">
+                            {fmtDate(b.checkInDate, 'dd MMM yyyy')} ➔ {fmtDate(b.checkOutDate, 'dd MMM yyyy')}
                           </p>
-                          <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                            <Mail className="h-3 w-3 text-slate-400" /> {b.guest?.email || 'vikram@example.com'}
+                          <p className="text-xs font-extrabold text-slate-700">{b.nights || 1} {b.nights === 1 ? 'night' : 'nights'}</p>
+                        </div>
+
+                        {/* Right: Status Checklist */}
+                        <div className="space-y-1.5 sm:border-l border-slate-100 sm:pl-4 text-xs font-semibold text-slate-700">
+                          <p className="flex items-center gap-1.5 text-emerald-600">
+                            <ShieldCheck className="h-4 w-4 text-emerald-500" /> ID: {b.guest?.idType || 'Document'}
+                          </p>
+                          <p className="flex items-center gap-1.5 text-slate-600">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Status: {b.bookingStatus}
+                          </p>
+                          <p className="flex items-center gap-1.5 text-amber-700">
+                            <Clock3 className="h-4 w-4 text-amber-500" /> Payment:{' '}
+                            <b className="text-slate-900">{money(b.balanceAmount || 0)} due</b>
                           </p>
                         </div>
-                      </div>
 
-                      {/* Middle: Room Info */}
-                      <div className="space-y-1 sm:border-l border-slate-100 sm:pl-4">
-                        <div className="flex items-center gap-2">
-                          <BedDouble className="h-4 w-4 text-blue-600" />
-                          <span className="font-black text-slate-900 text-sm">Room {b.room?.roomNumber || '107'}</span>
+                        {/* Right Actions */}
+                        <div className="flex flex-wrap sm:flex-col gap-2 items-stretch sm:items-end sm:border-l border-slate-100 sm:pl-4 pt-2 sm:pt-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCheckInModalBooking(b);
+                            }}
+                            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 sm:py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-xs min-h-[40px]"
+                          >
+                            Complete Check-in
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCheckInModalBooking(b);
+                            }}
+                            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 sm:py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors min-h-[40px]"
+                          >
+                            Verify ID
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openBookingDrawer(b._id);
+                            }}
+                            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 sm:py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors min-h-[40px]"
+                          >
+                            <Eye className="h-3.5 w-3.5" /> View
+                          </button>
                         </div>
-                        <p className="text-xs font-extrabold text-slate-600">{b.room?.roomType?.name || 'Deluxe (AC)'}</p>
-                        <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">
-                          {b.room?.floor || 1}st Floor
-                        </span>
-                        <p className="text-xs font-semibold text-slate-500 mt-1">
-                          {fmtDate(b.checkInDate, 'dd MMM 2026')} ➔ {fmtDate(b.checkOutDate, 'dd MMM 2026')}
-                        </p>
-                        <p className="text-xs font-extrabold text-slate-700">{b.nights || 3} nights</p>
                       </div>
-
-                      {/* Right: Status Checklist */}
-                      <div className="space-y-1.5 sm:border-l border-slate-100 sm:pl-4 text-xs font-semibold text-slate-700">
-                        <p className="flex items-center gap-1.5 text-emerald-600">
-                          <ShieldCheck className="h-4 w-4 text-emerald-500" /> ID: {b.guest?.idType || 'Aadhaar'} (Verified)
-                        </p>
-                        <p className="flex items-center gap-1.5 text-emerald-600">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Room is clean and ready
-                        </p>
-                        <p className="flex items-center gap-1.5 text-amber-700">
-                          <Clock3 className="h-4 w-4 text-amber-500" /> Payment:{' '}
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">Pending</span>{' '}
-                          <b className="text-slate-900">{money(b.balanceAmount || 10080)} due</b>
-                        </p>
-                      </div>
-
-                      {/* Right Actions */}
-                      <div className="flex flex-wrap sm:flex-col gap-2 items-stretch sm:items-end sm:border-l border-slate-100 sm:pl-4 pt-2 sm:pt-0">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCheckInModalBooking(b);
-                          }}
-                          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 sm:py-1.5 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-xs min-h-[40px]"
-                        >
-                          Complete Check-in
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCheckInModalBooking(b);
-                          }}
-                          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 sm:py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors min-h-[40px]"
-                        >
-                          Verify ID
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openBookingDrawer(b._id);
-                          }}
-                          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 sm:py-1 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors min-h-[40px]"
-                        >
-                          <Eye className="h-3.5 w-3.5" /> View
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </QueryBoundary>
           </div>
 
           {/* Section 2: Completed Today */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              <span className="text-base font-extrabold text-slate-900">Completed Today (1)</span>
-            </div>
+          {completedArrivals.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                <span className="text-base font-extrabold text-slate-900">Completed Today ({completedArrivals.length})</span>
+              </div>
 
-            <div className="space-y-3">
-              {(completedArrivals.length
-                ? completedArrivals
-                : [
-                    {
-                      _id: 'c1',
-                      bookingNumber: 'BK-2026-000009',
-                      guest: { name: 'Prasannajit Jena', phone: '+91 92245 89576', email: 'prasanna@example.com' },
-                      room: { roomNumber: '102', floor: 1, roomType: { name: 'Deluxe (AC)' } },
-                      checkInDate: '2026-09-20',
-                      checkOutDate: '2026-09-21',
-                      nights: 1,
-                      balanceAmount: 1990,
-                    },
-                  ]
-              ).map((b) => (
-                <div
-                  key={b._id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs"
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-800 text-sm font-black">
-                      {b.guest?.name ? b.guest.name.split(' ').map((n) => n[0]).slice(0, 2).join('') : 'PJ'}
+              <div className="space-y-3">
+                {completedArrivals.map((b) => (
+                  <div
+                    key={b._id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-800 text-sm font-black">
+                        {b.guest?.name ? b.guest.name.split(' ').map((n) => n[0]).slice(0, 2).join('') : 'G'}
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-bold text-slate-400">{b.bookingNumber}</p>
+                        <h3 className="text-base font-extrabold text-slate-900 leading-tight">{b.guest?.name || 'Guest'}</h3>
+                        {b.guest?.phone && (
+                          <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                            <Phone className="h-3 w-3 text-slate-400" /> {b.guest.phone}
+                          </p>
+                        )}
+                        {b.guest?.email && (
+                          <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                            <Mail className="h-3 w-3 text-slate-400" /> {b.guest.email}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[11px] font-bold text-slate-400">{b.bookingNumber}</p>
-                      <h3 className="text-base font-extrabold text-slate-900 leading-tight">{b.guest?.name}</h3>
-                      <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                        <Phone className="h-3 w-3 text-slate-400" /> {b.guest?.phone || '+91 92245 89576'}
+
+                    <div className="space-y-1 sm:border-l border-slate-100 sm:pl-4">
+                      <div className="flex items-center gap-2">
+                        <BedDouble className="h-4 w-4 text-blue-600" />
+                        <span className="font-black text-slate-900 text-sm">Room {b.room?.roomNumber || '—'}</span>
+                      </div>
+                      <p className="text-xs font-extrabold text-slate-600">{b.room?.roomType?.name || 'Standard'}</p>
+                      {b.room?.floor && (
+                        <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                          Floor {b.room.floor}
+                        </span>
+                      )}
+                      <p className="text-xs font-semibold text-slate-500 mt-1">
+                        {fmtDate(b.checkInDate, 'dd MMM yyyy')} ➔ {fmtDate(b.checkOutDate, 'dd MMM yyyy')}
                       </p>
-                      <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                        <Mail className="h-3 w-3 text-slate-400" /> {b.guest?.email || 'prasanna@example.com'}
+                      <p className="text-xs font-semibold text-slate-600">{b.nights || 1} {b.nights === 1 ? 'night' : 'nights'}</p>
+                    </div>
+
+                    <div className="space-y-1.5 sm:border-l border-slate-100 sm:pl-4 text-xs font-semibold">
+                      <p className="flex items-center gap-1.5 text-emerald-600 font-bold">
+                        <ShieldCheck className="h-4 w-4 text-emerald-500" /> ID: {b.guest?.idType || 'Verified'}
+                      </p>
+                      <p className="flex items-center gap-1.5 text-slate-600">
+                        <Clock3 className="h-3.5 w-3.5 text-slate-400" /> Status: Checked-in
+                      </p>
+                      <p className="flex items-center gap-1.5 text-slate-700">
+                        Payment: <b className="text-slate-900">{money(b.balanceAmount || 0)} due</b>
                       </p>
                     </div>
-                  </div>
 
-                  <div className="space-y-1 sm:border-l border-slate-100 sm:pl-4">
-                    <div className="flex items-center gap-2">
-                      <BedDouble className="h-4 w-4 text-blue-600" />
-                      <span className="font-black text-slate-900 text-sm">Room {b.room?.roomNumber || '102'}</span>
+                    <div className="flex flex-col gap-2 items-end sm:border-l border-slate-100 sm:pl-4">
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-800 border border-emerald-200">
+                        Checked-in
+                      </span>
+                      <button
+                        onClick={() => openBookingDrawer(b._id)}
+                        className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                      >
+                        <Eye className="h-3.5 w-3.5" /> View Booking
+                      </button>
                     </div>
-                    <p className="text-xs font-extrabold text-slate-600">{b.room?.roomType?.name || 'Deluxe (AC)'}</p>
-                    <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">
-                      1st Floor
-                    </span>
-                    <p className="text-xs font-semibold text-slate-500 mt-1">
-                      {fmtDate(b.checkInDate, 'dd MMM 2026')} ➔ {fmtDate(b.checkOutDate, 'dd MMM 2026')}
-                    </p>
-                    <p className="text-xs font-semibold text-slate-600">{b.nights || 1} night</p>
                   </div>
-
-                  <div className="space-y-1.5 sm:border-l border-slate-100 sm:pl-4 text-xs font-semibold">
-                    <p className="flex items-center gap-1.5 text-emerald-600 font-bold">
-                      <ShieldCheck className="h-4 w-4 text-emerald-500" /> ID: Aadhaar (Verified)
-                    </p>
-                    <p className="flex items-center gap-1.5 text-slate-600">
-                      <Clock3 className="h-3.5 w-3.5 text-slate-400" /> Checked-in at 11:30 AM
-                    </p>
-                    <p className="flex items-center gap-1.5 text-slate-700">
-                      Payment:{' '}
-                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
-                        Partial
-                      </span>{' '}
-                      <b className="text-slate-900">{money(b.balanceAmount || 1990)} due</b>
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-2 items-end sm:border-l border-slate-100 sm:pl-4">
-                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-800 border border-emerald-200">
-                      Checked-in
-                    </span>
-                    <button
-                      onClick={() => openBookingDrawer(b._id)}
-                      className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
-                    >
-                      <Eye className="h-3.5 w-3.5" /> View Booking
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Right Column: Interactive Guest Details Side Panel */}
@@ -408,7 +385,7 @@ export default function CheckInPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-100 text-blue-700 font-black text-sm">
-                      {activeGuest.guest?.name ? activeGuest.guest.name.split(' ').map((n) => n[0]).slice(0, 2).join('') : 'VS'}
+                      {activeGuest.guest?.name ? activeGuest.guest.name.split(' ').map((n) => n[0]).slice(0, 2).join('') : 'G'}
                     </div>
                     <div>
                       <h2 className="text-base font-extrabold text-slate-900">{activeGuest.guest?.name}</h2>

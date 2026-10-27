@@ -445,8 +445,12 @@ function RoomsTab({ tOpts, aOpts, onEditRoom, onAddRoom }) {
         {paginatedRooms.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-400">
             <BedDouble className="h-8 w-8 mx-auto mb-2 opacity-40" />
-            <p className="font-bold text-sm text-slate-600">No rooms found</p>
-            <p className="text-xs mt-1">Try resetting filters or adding a room.</p>
+            <p className="font-bold text-sm text-slate-600">
+              {rooms.length === 0 ? 'No rooms found. Add your first room.' : 'No rooms found'}
+            </p>
+            <p className="text-xs mt-1">
+              {rooms.length === 0 ? 'Create a room to start managing inventory and bookings.' : 'Try resetting filters or adding a room.'}
+            </p>
             {can('rooms.create') && (
               <button
                 onClick={onAddRoom}
@@ -589,8 +593,12 @@ function RoomsTab({ tOpts, aOpts, onEditRoom, onAddRoom }) {
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400">
                     <BedDouble className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    <p className="font-bold text-sm text-slate-600">No rooms found</p>
-                    <p className="text-xs mt-1">Try resetting your filters or add a new room.</p>
+                    <p className="font-bold text-sm text-slate-600">
+                      {rooms.length === 0 ? 'No rooms found. Add your first room.' : 'No rooms found'}
+                    </p>
+                    <p className="text-xs mt-1">
+                      {rooms.length === 0 ? 'Create a room to start managing inventory and bookings.' : 'Try resetting your filters or add a new room.'}
+                    </p>
                     {can('rooms.create') && (
                       <button
                         onClick={onAddRoom}

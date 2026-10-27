@@ -268,20 +268,7 @@ export default function GuestsPage() {
 
   const items = guestsQuery.data?.items || [];
 
-  const defaultGuestRows = [
-    { _id: 'g1', guestId: 'GST-00011', name: 'PRASANNAJIT JENA', phone: '7790052789', email: 'prasannajitjena00@gmail.com', totalStays: 0, totalSpent: 0, lastVisit: null, status: 'New Guest', avatarBg: 'bg-purple-100 text-purple-700' },
-    { _id: 'g2', guestId: 'GST-00010', name: 'PRASANNAJIT JENA', phone: '9876543210', email: 'prasannajitjena00@gmail.com', totalStays: 0, totalSpent: 0, lastVisit: null, status: 'New Guest', avatarBg: 'bg-rose-100 text-rose-700' },
-    { _id: 'g3', guestId: 'GST-00009', name: 'PRASANNAJIT JENA', phone: '07790052789', email: 'prasannajitjena00@gmail.com', totalStays: 0, totalSpent: 0, lastVisit: null, status: 'New Guest', avatarBg: 'bg-teal-100 text-teal-700' },
-    { _id: 'g4', guestId: 'GST-00008', name: 'Neha Gupta', phone: '9000000008', email: 'neha@demo.test', totalStays: 0, totalSpent: 0, lastVisit: null, status: 'New Guest', avatarBg: 'bg-purple-100 text-purple-700' },
-    { _id: 'g5', guestId: 'GST-00007', name: 'Arjun Mehta', phone: '9000000007', email: 'arjun@demo.test', totalStays: 0, totalSpent: 0, lastVisit: null, status: 'New Guest', avatarBg: 'bg-amber-100 text-amber-800' },
-    { _id: 'g6', guestId: 'GST-00006', name: 'Sneha Rao', phone: '9000000006', email: 'sneha@demo.test', totalStays: 0, totalSpent: 0, lastVisit: null, status: 'New Guest', avatarBg: 'bg-rose-100 text-rose-700' },
-    { _id: 'g7', guestId: 'GST-00005', name: 'Amit Patel', phone: '9000000005', email: 'amit@demo.test', totalStays: 0, totalSpent: 0, lastVisit: null, status: 'New Guest', avatarBg: 'bg-emerald-100 text-emerald-800' },
-    { _id: 'g8', guestId: 'GST-00004', name: 'Kavita Nair', phone: '9000000004', email: 'kavita@demo.test', totalStays: 1, totalSpent: 4480, lastVisit: '2026-09-20', status: 'Past Guest', avatarBg: 'bg-purple-100 text-purple-700' },
-    { _id: 'g9', guestId: 'GST-00003', name: 'Vikram Singh', phone: '9000000003', email: 'vikram@demo.test', totalStays: 0, totalSpent: 0, lastVisit: null, status: 'New Guest', avatarBg: 'bg-blue-100 text-blue-700' },
-    { _id: 'g10', guestId: 'GST-00002', name: 'Rahul Sharma', phone: '9000000001', email: 'rahul@demo.test', totalStays: 0, totalSpent: 0, lastVisit: null, status: 'New Guest', avatarBg: 'bg-amber-100 text-amber-800' },
-  ];
-
-  const rawRows = items.length ? items : defaultGuestRows;
+  const rawRows = items;
 
   // Filter rows based on tabs & dropdowns
   const filteredRows = rawRows.filter((g) => {
@@ -484,7 +471,17 @@ export default function GuestsPage() {
       <div className="space-y-3 md:hidden">
         {paginatedRows.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-400 font-medium">
-            No guests found matching the selected filters.
+            <p className="font-bold text-slate-700 text-sm">
+              {items.length === 0 ? 'No guests registered yet.' : 'No guests found matching the selected filters.'}
+            </p>
+            {items.length === 0 && can('guests.create') && (
+              <button
+                onClick={() => setEditModal({})}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-md"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add First Guest
+              </button>
+            )}
           </div>
         ) : (
           paginatedRows.map((r) => {
@@ -603,7 +600,17 @@ export default function GuestsPage() {
               {paginatedRows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
-                    No guests found matching the selected filters.
+                    <p className="font-bold text-slate-700 text-sm">
+                      {items.length === 0 ? 'No guests registered yet.' : 'No guests found matching the selected filters.'}
+                    </p>
+                    {items.length === 0 && can('guests.create') && (
+                      <button
+                        onClick={() => setEditModal({})}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-md"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add First Guest
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (

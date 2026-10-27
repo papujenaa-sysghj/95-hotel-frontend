@@ -132,7 +132,7 @@ export default function PaymentsPage() {
           <QueryBoundary
             q={pays}
             isEmpty={!pays.data?.items?.length}
-            empty={<EmptyState title="No payments recorded" />}
+            empty={<EmptyState title="No payments recorded." message="Payment transactions will appear here as they are processed." />}
           >
             {/* Mobile Payment History Cards (< md) */}
             <div className="divide-y divide-slate-100 md:hidden">

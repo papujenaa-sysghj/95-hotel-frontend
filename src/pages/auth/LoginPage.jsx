@@ -34,7 +34,7 @@ export function AuthShell({ title, subtitle, children }) {
               <Hotel className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-base font-extrabold tracking-tight text-white leading-tight">Hotel PMS</h1>
+              <h1 className="text-base font-extrabold tracking-tight text-white leading-tight">GS Hotels</h1>
               <p className="text-[11px] font-medium text-slate-400">Property Management System</p>
             </div>
           </div>
@@ -165,7 +165,7 @@ export function AuthShell({ title, subtitle, children }) {
             <div className="h-9 w-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md">
               <Hotel className="h-5 w-5" />
             </div>
-            <span className="text-lg font-bold text-slate-900">Hotel PMS</span>
+            <span className="text-lg font-bold text-slate-900">GS Hotels</span>
           </div>
         </div>
 
@@ -176,7 +176,7 @@ export function AuthShell({ title, subtitle, children }) {
             <div className="h-11 w-11 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/25 mb-2.5">
               <Hotel className="h-6 w-6" />
             </div>
-            <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">Hotel PMS</h2>
+            <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">GS Hotels</h2>
             <p className="text-xs text-slate-400 font-medium">Property Management System</p>
           </div>
 
@@ -233,41 +233,6 @@ export default function LoginPage() {
             {error}
           </div>
         )}
-
-        {/* Demo Credentials Quick Fill Pills */}
-        <div className="rounded-2xl bg-slate-50 border border-slate-200/80 p-3 text-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-slate-800 text-[11px] tracking-wide uppercase">
-              Quick Auto-Fill Role
-            </span>
-            <span className="text-[10px] text-slate-400 font-medium">
-              Password: <code className="bg-slate-200/70 px-1 py-0.5 rounded text-slate-700">Hotel@12345</code>
-            </span>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5 pt-0.5">
-            {[
-              { label: 'Admin', email: 'admin@hotel.com', bg: 'hover:bg-blue-600 hover:text-white border-blue-200 text-blue-700 bg-blue-50/60' },
-              { label: 'Manager', email: 'manager@hotel.com', bg: 'hover:bg-indigo-600 hover:text-white border-indigo-200 text-indigo-700 bg-indigo-50/60' },
-              { label: 'Reception', email: 'reception@hotel.com', bg: 'hover:bg-teal-600 hover:text-white border-teal-200 text-teal-700 bg-teal-50/60' },
-              { label: 'Cashier', email: 'cashier@hotel.com', bg: 'hover:bg-purple-600 hover:text-white border-purple-200 text-purple-700 bg-purple-50/60' },
-              { label: 'Housekeeping', email: 'housekeeping@hotel.com', bg: 'hover:bg-amber-600 hover:text-white border-amber-200 text-amber-700 bg-amber-50/60' },
-            ].map((role) => (
-              <button
-                key={role.label}
-                type="button"
-                onClick={() => {
-                  f.setValue('identifier', role.email);
-                  f.setValue('password', 'Hotel@12345');
-                  setError('');
-                }}
-                className={`px-2.5 py-1 text-[11px] font-semibold border rounded-lg transition-all shadow-2xs active:scale-95 ${role.bg}`}
-              >
-                + {role.label}
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Email / Username Field */}
         <div>

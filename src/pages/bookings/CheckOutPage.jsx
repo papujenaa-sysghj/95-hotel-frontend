@@ -6,7 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { bookingApi } from '../../services/booking.api';
 import { useUI } from '../../store/ui';
 import { CheckoutModal } from '../../components/booking/BookingDrawer';
-import { Card, QueryBoundary, cx } from '../../components/common/ui';
+import { Card, QueryBoundary, EmptyState, cx } from '../../components/common/ui';
 import { money, fmtDate } from '../../utils/format';
 import { config } from '../../config';
 
@@ -24,11 +24,11 @@ export default function CheckOutPage() {
 
   const items = q.data?.items || [];
 
-  // Categorize
+  // Categorize dynamically
   const checkedOutCount = items.filter((b) => b.bookingStatus === 'checked_out').length;
-  const pendingCount = items.filter((b) => b.bookingStatus !== 'checked_out').length || 1;
-  const totalCount = items.length || 1;
-  const expectedRevenue = items.reduce((sum, b) => sum + (b.totalAmount || 0), 0) || 4480;
+  const pendingCount = items.filter((b) => b.bookingStatus !== 'checked_out').length;
+  const totalCount = items.length;
+  const expectedRevenue = items.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
 
   const pieData = [
     { name: 'Checked Out', value: checkedOutCount, color: '#10B981' },
@@ -102,7 +102,7 @@ export default function CheckOutPage() {
           {/* Date Indicator */}
           <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-700">
             <CalendarIcon className="h-3.5 w-3.5 text-slate-500" />
-            <span>20 Sep 2026</span>
+            <span>{fmtDate(new Date(), 'dd MMM yyyy')}</span>
           </div>
         </div>
 
@@ -211,7 +211,7 @@ export default function CheckOutPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                👥 Guests Checking Out Today ({items.length || 1})
+                👥 Guests Checking Out Today ({items.length})
               </h2>
               <p className="text-xs text-slate-500">Complete the check-out process and settle payments.</p>
             </div>
@@ -224,97 +224,95 @@ export default function CheckOutPage() {
           </div>
 
           <QueryBoundary q={q} isEmpty={false}>
-            <div className="space-y-3.5">
-              {(items.length ? items : [
-                {
-                  _id: 'd1',
-                  bookingNumber: 'BK-2026-000004',
-                  guest: { name: 'Kavita Nair', phone: '+91 98765 43210', email: 'kavita@example.com', idType: 'Aadhaar' },
-                  room: { roomNumber: '201', floor: 2, roomType: { name: 'Deluxe (AC)' } },
-                  checkOutDate: '2026-09-17',
-                  bookingStatus: 'checked_out',
-                  totalAmount: 4480,
-                  balanceAmount: 0,
-                  paidAmount: 4480,
-                }
-              ]).map((b) => {
-                return (
-                  <div
-                    key={b._id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs transition-all hover:border-slate-300"
-                  >
-                    {/* Guest Bio */}
-                    <div className="flex items-center gap-3.5 min-w-[200px]">
-                      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-purple-100 text-purple-700 font-extrabold text-sm">
-                        {b.guest?.name ? b.guest.name.split(' ').map((n) => n[0]).slice(0, 2).join('') : 'KN'}
+            {items.length === 0 ? (
+              <EmptyState
+                icon="👥"
+                title="No check-outs scheduled"
+                description="There are no guests due to check out today."
+              />
+            ) : (
+              <div className="space-y-3.5">
+                {items.map((b) => {
+                  return (
+                    <div
+                      key={b._id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs transition-all hover:border-slate-300"
+                    >
+                      {/* Guest Bio */}
+                      <div className="flex items-center gap-3.5 min-w-[200px]">
+                        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-purple-100 text-purple-700 font-extrabold text-sm">
+                          {b.guest?.name ? b.guest.name.split(' ').map((n) => n[0]).slice(0, 2).join('') : 'G'}
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-bold text-slate-400">{b.bookingNumber}</p>
+                          <h3 className="text-base font-extrabold text-slate-900 leading-tight">{b.guest?.name || 'Guest'}</h3>
+                          {b.guest?.phone && (
+                            <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                              <Phone className="h-3 w-3 text-slate-400" /> {b.guest.phone}
+                            </p>
+                          )}
+                          {b.guest?.email && (
+                            <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                              <Mail className="h-3 w-3 text-slate-400" /> {b.guest.email}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-[11px] font-bold text-slate-400">{b.bookingNumber}</p>
-                        <h3 className="text-base font-extrabold text-slate-900 leading-tight">{b.guest?.name}</h3>
-                        <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                          <Phone className="h-3 w-3 text-slate-400" /> {b.guest?.phone || '+91 98765 43210'}
+
+                      {/* Room Info */}
+                      <div className="space-y-1 sm:border-l border-slate-100 sm:pl-4">
+                        <div className="flex items-center gap-2">
+                          <BedDouble className="h-4 w-4 text-blue-600" />
+                          <span className="font-black text-slate-900 text-sm">Room {b.room?.roomNumber || '—'}</span>
+                        </div>
+                        <p className="text-xs font-extrabold text-slate-600">{b.room?.roomType?.name || 'Standard'}</p>
+                        {b.room?.floor && (
+                          <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                            Floor {b.room.floor}
+                          </span>
+                        )}
+                        <p className="text-xs font-semibold text-slate-500 mt-1">
+                          Check-out: <span className="font-extrabold text-slate-800">{fmtDate(b.checkOutDate, 'dd MMM yyyy')}</span>
                         </p>
-                        <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                          <Mail className="h-3 w-3 text-slate-400" /> {b.guest?.email || 'kavita@example.com'}
+                      </div>
+
+                      {/* Status Checklist */}
+                      <div className="space-y-1.5 sm:border-l border-slate-100 sm:pl-4 text-xs font-semibold text-slate-700">
+                        <p className="flex items-center gap-1.5 text-emerald-600">
+                          <ShieldCheck className="h-4 w-4 text-emerald-500" /> ID: {b.guest?.idType || 'Document'}
+                        </p>
+                        <p className="flex items-center gap-1.5 text-slate-600">
+                          <Home className="h-4 w-4 text-slate-400" /> Status: {b.bookingStatus}
+                        </p>
+                        <p className="flex items-center gap-1.5 text-amber-700">
+                          <IndianRupee className="h-3.5 w-3.5 text-amber-600" /> Balance:{' '}
+                          <b className="text-slate-900">{money(b.balanceAmount || 0)}</b>
                         </p>
                       </div>
-                    </div>
 
-                    {/* Room Info */}
-                    <div className="space-y-1 sm:border-l border-slate-100 sm:pl-4">
-                      <div className="flex items-center gap-2">
-                        <BedDouble className="h-4 w-4 text-blue-600" />
-                        <span className="font-black text-slate-900 text-sm">Room {b.room?.roomNumber || '201'}</span>
+                      {/* Right Actions */}
+                      <div className="flex flex-wrap sm:flex-col gap-2 items-stretch sm:items-end sm:border-l border-slate-100 sm:pl-4 pt-2 sm:pt-0">
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700 border border-slate-200 self-start sm:self-auto">
+                          {b.bookingStatus === 'checked_out' ? 'Checked out' : 'Pending Check-out'}
+                        </span>
+                        <button
+                          onClick={() => openBookingDrawer(b._id)}
+                          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 sm:py-1.5 text-xs font-bold text-blue-600 hover:bg-slate-50 transition-colors min-h-[40px]"
+                        >
+                          <Eye className="h-3.5 w-3.5" /> View
+                        </button>
+                        <button
+                          onClick={() => openBookingDrawer(b._id)}
+                          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 sm:py-1.5 text-xs font-bold text-blue-600 hover:bg-slate-50 transition-colors min-h-[40px]"
+                        >
+                          <Printer className="h-3.5 w-3.5" /> Receipt
+                        </button>
                       </div>
-                      <p className="text-xs font-extrabold text-slate-600">{b.room?.roomType?.name || 'Deluxe (AC)'}</p>
-                      <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">
-                        {b.room?.floor || 2}nd Floor
-                      </span>
-                      <p className="text-xs font-semibold text-slate-500 mt-1">
-                        Check-out: <span className="font-extrabold text-slate-800">{fmtDate(b.checkOutDate, 'dd MMM yyyy')}</span>
-                      </p>
-                      <p className="text-xs font-bold text-rose-600">3 days ago</p>
                     </div>
-
-                    {/* Status Checklist */}
-                    <div className="space-y-1.5 sm:border-l border-slate-100 sm:pl-4 text-xs font-semibold text-slate-700">
-                      <p className="flex items-center gap-1.5 text-emerald-600">
-                        <ShieldCheck className="h-4 w-4 text-emerald-500" /> ID: {b.guest?.idType || 'Aadhaar'} (Verified)
-                      </p>
-                      <p className="flex items-center gap-1.5 text-emerald-600">
-                        <Home className="h-4 w-4 text-emerald-500" /> Room is clean and ready
-                      </p>
-                      <p className="flex items-center gap-1.5 text-amber-700">
-                        <IndianRupee className="h-3.5 w-3.5 text-amber-600" /> Payment:{' '}
-                        <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                          Paid
-                        </span>{' '}
-                        <b className="text-slate-900">{money(b.totalAmount || 4480)}</b>
-                      </p>
-                    </div>
-
-                    {/* Right Actions */}
-                    <div className="flex flex-wrap sm:flex-col gap-2 items-stretch sm:items-end sm:border-l border-slate-100 sm:pl-4 pt-2 sm:pt-0">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700 border border-slate-200 self-start sm:self-auto">
-                        Checked out
-                      </span>
-                      <button
-                        onClick={() => openBookingDrawer(b._id)}
-                        className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 sm:py-1.5 text-xs font-bold text-blue-600 hover:bg-slate-50 transition-colors min-h-[40px]"
-                      >
-                        <Eye className="h-3.5 w-3.5" /> View
-                      </button>
-                      <button
-                        onClick={() => openBookingDrawer(b._id)}
-                        className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 sm:py-1.5 text-xs font-bold text-blue-600 hover:bg-slate-50 transition-colors min-h-[40px]"
-                      >
-                        <Printer className="h-3.5 w-3.5" /> Receipt
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </QueryBoundary>
 
           {/* Celebration Box */}
@@ -322,8 +320,8 @@ export default function CheckOutPage() {
             <div className="grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-blue-600 mx-auto">
               <PartyPopper className="h-6 w-6" />
             </div>
-            <h3 className="text-base font-black text-slate-900">That's all for today!</h3>
-            <p className="text-xs font-semibold text-slate-500">No more guests due for check-out.</p>
+            <h3 className="text-base font-black text-slate-900">Check-out Desk</h3>
+            <p className="text-xs font-semibold text-slate-500">Live operational departures monitoring.</p>
           </div>
         </div>
 
@@ -343,7 +341,7 @@ export default function CheckOutPage() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                  <span className="text-xl font-black text-slate-900">1</span>
+                  <span className="text-xl font-black text-slate-900">{totalCount}</span>
                   <span className="text-[10px] font-bold text-slate-400">Total</span>
                 </div>
               </div>
@@ -353,13 +351,13 @@ export default function CheckOutPage() {
                   <span className="flex items-center gap-1.5 text-slate-700">
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Checked Out
                   </span>
-                  <span className="font-extrabold text-slate-900">0 (0%)</span>
+                  <span className="font-extrabold text-slate-900">{checkedOutCount} ({totalCount ? Math.round((checkedOutCount / totalCount) * 100) : 0}%)</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-slate-700">
                     <span className="h-2.5 w-2.5 rounded-full bg-blue-600" /> Pending
                   </span>
-                  <span className="font-extrabold text-slate-900">1 (100%)</span>
+                  <span className="font-extrabold text-slate-900">{pendingCount} ({totalCount ? Math.round((pendingCount / totalCount) * 100) : 0}%)</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-slate-700">

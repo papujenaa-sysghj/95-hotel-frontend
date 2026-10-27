@@ -106,7 +106,19 @@ export default function MaintenancePage() {
         <QueryBoundary
           q={q}
           isEmpty={!items.length}
-          empty={<EmptyState title="No maintenance records" message="Reported faults will appear here." />}
+          empty={
+            <EmptyState
+              title="No maintenance records available."
+              message="Reported faults will appear here."
+              action={
+                can('maintenance.create') && (
+                  <button className="btn-primary" onClick={() => setOpen(true)}>
+                    <Plus className="h-4 w-4" /> Report Issue
+                  </button>
+                )
+              }
+            />
+          }
         >
           {/* Mobile Maintenance Cards View (< md) */}
           <div className="divide-y divide-slate-100 md:hidden">

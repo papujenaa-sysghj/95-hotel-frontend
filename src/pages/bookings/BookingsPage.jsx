@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Eye, FileText, ShieldCheck } from 'lucide-react';
+import { Search, Eye, FileText, ShieldCheck, Plus } from 'lucide-react';
 import { bookingApi } from '../../services/booking.api';
 import { openDocUrl } from '../../services/api';
 import { useUI } from '../../store/ui';
@@ -10,7 +10,7 @@ import { fmtDate, money, STATUS } from '../../utils/format';
 
 export default function BookingsPage() {
   const [sp] = useSearchParams();
-  const open = useUI((s) => s.openBooking);
+  const { openBooking: open, openWizard } = useUI();
   const [f, setF] = useState({ q: '', status: sp.get('status') || '', paymentStatus: '' });
   const [page, setPage] = useState(1);
 
@@ -57,7 +57,21 @@ export default function BookingsPage() {
             ))}
           </select>
         </div>
-        <QueryBoundary q={q} isEmpty={!q.data?.items.length} empty={<EmptyState title="No bookings found" message="Change the filters or create a new booking." />}>
+        <QueryBoundary
+          q={q}
+          isEmpty={!q.data?.items.length}
+          empty={
+            <EmptyState
+              title="No bookings available."
+              message="Create your first booking to get started."
+              action={
+                <button className="btn-primary" onClick={() => openWizard()}>
+                  <Plus className="h-4 w-4" /> New Booking
+                </button>
+              }
+            />
+          }
+        >
         {/* Desktop Table View */}
         <div className="hidden md:block">
           <DataTable

@@ -267,7 +267,9 @@ export default function Topbar() {
     nav('/login');
   };
 
-  const initials = user?.name ? user.name.split(' ').map((s) => s[0]).slice(0, 2).join('') : 'DA';
+  const settingsQ = useQuery({ queryKey: ['settings'], queryFn: () => unwrap(api.get('/settings')), staleTime: 300000 });
+  const hotelName = settingsQ.data?.hotel?.name || 'GS Hotels';
+  const initials = user?.name ? user.name.split(' ').map((s) => s[0]).slice(0, 2).join('') : 'U';
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2.5 border-b border-slate-200/80 bg-white/95 px-3 sm:px-4 backdrop-blur-md lg:px-6">
@@ -280,7 +282,7 @@ export default function Topbar() {
           <Menu className="h-5 w-5" />
         </button>
         <span className="text-sm font-black tracking-tight text-slate-900 lg:hidden truncate max-w-[120px] xs:max-w-none">
-          Hotel Bliss
+          {hotelName}
         </span>
       </div>
 
@@ -299,8 +301,8 @@ export default function Topbar() {
               {initials}
             </span>
             <div className="hidden text-left sm:block">
-              <p className="text-xs font-extrabold leading-tight text-slate-900 truncate max-w-[110px]">{user?.name || 'Demo Admin'}</p>
-              <p className="text-[10px] font-medium text-slate-500 truncate max-w-[110px]">{user?.role || 'Super Admin'}</p>
+              <p className="text-xs font-extrabold leading-tight text-slate-900 truncate max-w-[110px]">{user?.name || 'User'}</p>
+              <p className="text-[10px] font-medium text-slate-500 truncate max-w-[110px]">{user?.role || 'Staff'}</p>
             </div>
             <ChevronDown className="h-3.5 w-3.5 text-slate-400 hidden sm:block" />
           </button>

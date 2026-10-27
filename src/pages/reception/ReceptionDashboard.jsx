@@ -16,6 +16,7 @@ export default function ReceptionDashboard() {
   const can = useCan();
   const todayStr = new Date().toISOString().slice(0, 10);
   const [statusDate, setStatusDate] = useState(todayStr);
+  const [overviewFilter, setOverviewFilter] = useState('all');
   const [selectedFloor, setSelectedFloor] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
 
@@ -80,47 +81,47 @@ export default function ReceptionDashboard() {
         <Stat
           loading={q.isLoading}
           label="Total Rooms"
-          value={s?.totalRooms || 50}
+          value={s?.totalRooms ?? 0}
           icon={BedDouble}
           tone="bg-blue-50 text-blue-600"
         />
         <Stat
           loading={q.isLoading}
           label="Occupied"
-          value={s?.occupied || 2}
-          hint={`${Math.round(((s?.occupied || 2) / (s?.totalRooms || 50)) * 100)}%`}
+          value={s?.occupied ?? 0}
+          hint={s?.totalRooms ? `${Math.round(((s.occupied || 0) / s.totalRooms) * 100)}%` : '0%'}
           icon={DoorClosed}
           tone="bg-blue-50 text-blue-600"
         />
         <Stat
           loading={q.isLoading}
           label="Available"
-          value={s?.available || 42}
-          hint={`${Math.round(((s?.available || 42) / (s?.totalRooms || 50)) * 100)}%`}
+          value={s?.available ?? 0}
+          hint={s?.totalRooms ? `${Math.round(((s.available || 0) / s.totalRooms) * 100)}%` : '0%'}
           icon={DoorOpen}
           tone="bg-emerald-50 text-emerald-600"
         />
         <Stat
           loading={q.isLoading}
           label="Arrivals Today"
-          value={s?.todayCheckIns || 2}
-          hint="+2"
+          value={s?.todayCheckIns ?? 0}
+          hint={s?.todayCheckIns ? `${s.todayCheckIns} scheduled` : undefined}
           icon={LogIn}
           tone="bg-blue-50 text-blue-600"
         />
         <Stat
           loading={q.isLoading}
           label="Departures Today"
-          value={s?.todayCheckOuts || 0}
-          hint="0%"
+          value={s?.todayCheckOuts ?? 0}
+          hint={s?.todayCheckOuts ? `${s.todayCheckOuts} scheduled` : undefined}
           icon={LogOut}
           tone="bg-orange-50 text-orange-600"
         />
         <Stat
           loading={q.isLoading}
           label="Pending Payments"
-          value={money(s?.pendingPayments || 67128)}
-          hint={`${s?.pendingCount || 5} bookings`}
+          value={money(s?.pendingPayments || 0)}
+          hint={s?.pendingCount ? `${s.pendingCount} booking${s.pendingCount === 1 ? '' : 's'}` : 'All settled'}
           icon={Clock3}
           tone="bg-rose-50 text-rose-600"
         />
@@ -170,8 +171,8 @@ export default function ReceptionDashboard() {
         pad
       >
         <QueryBoundary q={q} skeleton={<RoomStatusGrid loading />}>
-          <RoomStatusGrid rooms={filteredRooms} />
-          <RoomLegend />
+          <RoomStatusGrid rooms={filteredRooms} date={statusDate} filter={overviewFilter} onFilterChange={setOverviewFilter} />
+          <RoomLegend activeFilter={overviewFilter} onSelectFilter={setOverviewFilter} />
         </QueryBoundary>
       </Card>
 
@@ -179,7 +180,7 @@ export default function ReceptionDashboard() {
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {/* Today's Arrivals */}
         <Card
-          title={`Today's Arrivals (${q.data?.arrivals?.length || 2})`}
+          title={`Today's Arrivals (${q.data?.arrivals?.length || 0})`}
           action={
             <Link to="/check-in" className="text-xs font-bold text-blue-600 hover:text-blue-700">
               View All
@@ -188,22 +189,25 @@ export default function ReceptionDashboard() {
           pad={false}
         >
           <QueryBoundary q={q}>
-            <div className="divide-y divide-slate-100">
-              {(q.data?.arrivals || [
-                { _id: '1', guest: { name: 'Vikram Singh' }, room: { roomNumber: '107' }, checkInTime: '2:00 PM', bookingStatus: 'confirmed' },
-                { _id: '2', guest: { name: 'Arjun Mehta' }, room: { roomNumber: '204' }, checkInTime: '3:00 PM', bookingStatus: 'confirmed' },
-              ]).slice(0, 4).map((b) => (
-                <div key={b._id} onClick={() => openBooking(b._id)} className="flex items-center justify-between p-3.5 hover:bg-slate-50/80 transition-all cursor-pointer">
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">{b.guest?.name}</p>
-                    <p className="text-[11px] font-medium text-slate-500">Room {b.room?.roomNumber || 'TBD'} · {b.checkInTime || '2:00 PM'}</p>
+            {q.data?.arrivals?.length ? (
+              <div className="divide-y divide-slate-100">
+                {q.data.arrivals.slice(0, 4).map((b) => (
+                  <div key={b._id} onClick={() => openBooking(b._id)} className="flex items-center justify-between p-3.5 hover:bg-slate-50/80 transition-all cursor-pointer">
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">{b.guest?.name}</p>
+                      <p className="text-[11px] font-medium text-slate-500">Room {b.room?.roomNumber || 'TBD'} · {b.actualCheckIn ? fmtDateTime(b.actualCheckIn).split(', ')[1] : 'Expected today'}</p>
+                    </div>
+                    <Badge status={b.bookingStatus} />
                   </div>
-                  <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                    + Confirmed
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <LogIn className="h-9 w-9 text-slate-300 mb-2" />
+                <p className="text-xs font-extrabold text-slate-700">No arrivals today</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">No guest check-ins scheduled for today.</p>
+              </div>
+            )}
           </QueryBoundary>
         </Card>
 
@@ -242,7 +246,7 @@ export default function ReceptionDashboard() {
 
         {/* Upcoming Bookings */}
         <Card
-          title={`Upcoming Bookings (${up.data?.items?.length || 5})`}
+          title={`Upcoming Bookings (${up.data?.items?.length || 0})`}
           action={
             <Link to="/bookings" className="text-xs font-bold text-blue-600 hover:text-blue-700">
               View All
@@ -251,31 +255,31 @@ export default function ReceptionDashboard() {
           pad={false}
         >
           <QueryBoundary q={up}>
-            <div className="divide-y divide-slate-100">
-              {(up.data?.items || [
-                { _id: 'u1', guest: { name: 'Neha Gupta' }, room: { roomNumber: '308' }, checkInDate: '2026-09-23', bookingStatus: 'hold' },
-                { _id: 'u2', guest: { name: 'Sneha Rao' }, room: { roomNumber: '110' }, checkInDate: '2026-09-22', bookingStatus: 'confirmed' },
-                { _id: 'u3', guest: { name: 'Amit Patel' }, room: { roomNumber: '105' }, checkInDate: '2026-09-21', bookingStatus: 'confirmed' },
-                { _id: 'u4', guest: { name: 'Arjun Mehta' }, room: { roomNumber: '204' }, checkInDate: '2026-09-20', bookingStatus: 'confirmed' },
-                { _id: 'u5', guest: { name: 'Vikram Singh' }, room: { roomNumber: '107' }, checkInDate: '2026-09-20', bookingStatus: 'confirmed' },
-              ]).slice(0, 5).map((b) => (
-                <div key={b._id} onClick={() => openBooking(b._id)} className="flex items-center justify-between p-3.5 hover:bg-slate-50/80 cursor-pointer">
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">{b.guest?.name}</p>
-                    <p className="text-[11px] font-medium text-slate-500">Room {b.room?.roomNumber || 'TBD'} · {fmtDate(b.checkInDate, 'dd MMM')}</p>
+            {up.data?.items?.length ? (
+              <div className="divide-y divide-slate-100">
+                {up.data.items.slice(0, 5).map((b) => (
+                  <div key={b._id} onClick={() => openBooking(b._id)} className="flex items-center justify-between p-3.5 hover:bg-slate-50/80 cursor-pointer">
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">{b.guest?.name}</p>
+                      <p className="text-[11px] font-medium text-slate-500">Room {b.room?.roomNumber || 'TBD'} · {fmtDate(b.checkInDate, 'dd MMM')}</p>
+                    </div>
+                    <Badge status={b.bookingStatus} />
                   </div>
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${b.bookingStatus === 'hold' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
-                    {b.bookingStatus === 'hold' ? '• Hold' : '+ Confirmed'}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <Clock3 className="h-9 w-9 text-slate-300 mb-2" />
+                <p className="text-xs font-extrabold text-slate-700">No upcoming bookings</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Future reservations will appear here.</p>
+              </div>
+            )}
           </QueryBoundary>
         </Card>
 
         {/* Payments to Collect */}
         <Card
-          title={`Payments to Collect (${owing.length || 5})`}
+          title={`Payments to Collect (${owing.length})`}
           action={
             <Link to="/payments" className="text-xs font-bold text-blue-600 hover:text-blue-700">
               View All
@@ -284,23 +288,25 @@ export default function ReceptionDashboard() {
           pad={false}
         >
           <QueryBoundary q={pend}>
-            <div className="divide-y divide-slate-100">
-              {(owing.length ? owing : [
-                { _id: 'p1', guest: { name: 'Sneha Rao' }, room: { roomNumber: '110' }, balanceAmount: 29120 },
-                { _id: 'p2', guest: { name: 'Amit Patel' }, room: { roomNumber: '105' }, balanceAmount: 8000 },
-                { _id: 'p3', guest: { name: 'Arjun Mehta' }, room: { roomNumber: '204' }, balanceAmount: 6720 },
-                { _id: 'p4', guest: { name: 'Vikram Singh' }, room: { roomNumber: '107' }, balanceAmount: 10080 },
-                { _id: 'p5', guest: { name: 'Rahul Sharma' }, room: { roomNumber: '101' }, balanceAmount: 3720 },
-              ]).map((b) => (
-                <div key={b._id} onClick={() => openBooking(b._id)} className="flex items-center justify-between p-3.5 hover:bg-slate-50/80 cursor-pointer">
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">{b.guest?.name}</p>
-                    <p className="text-[11px] font-medium text-slate-500">Room {b.room?.roomNumber || 'N/A'}</p>
+            {owing.length ? (
+              <div className="divide-y divide-slate-100">
+                {owing.slice(0, 5).map((b) => (
+                  <div key={b._id} onClick={() => openBooking(b._id)} className="flex items-center justify-between p-3.5 hover:bg-slate-50/80 cursor-pointer">
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">{b.guest?.name}</p>
+                      <p className="text-[11px] font-medium text-slate-500">Room {b.room?.roomNumber || 'N/A'}</p>
+                    </div>
+                    <span className="text-xs font-extrabold text-red-600">{money(b.balanceAmount)}</span>
                   </div>
-                  <span className="text-xs font-extrabold text-red-600">{money(b.balanceAmount)}</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <CreditCard className="h-9 w-9 text-slate-300 mb-2" />
+                <p className="text-xs font-extrabold text-slate-700">All balances settled</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">No pending guest payments.</p>
+              </div>
+            )}
           </QueryBoundary>
         </Card>
       </div>

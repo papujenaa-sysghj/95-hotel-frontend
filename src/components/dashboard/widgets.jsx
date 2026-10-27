@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { BedDouble, DoorOpen, DoorClosed, Wrench, Ban, UserCheck, UserPlus, LogIn, LogOut, CreditCard, Printer, Percent, CheckCircle2, ChevronRight, Plane } from 'lucide-react';
 import { Card, Badge, EmptyState, Skeleton, DataTable, cx } from '../common/ui';
@@ -13,19 +14,48 @@ export const ROOM_STYLES = {
   temp_non_ac: 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100/70',
 };
 
-export function RoomStatusGrid({ rooms, loading, date }) {
+export function RoomStatusGrid({ rooms = [], loading, date, filter, onFilterChange }) {
   const openBooking = useUI((s) => s.openBooking);
   const openWizard = useUI((s) => s.openWizard);
+  const [internalFilter, setInternalFilter] = useState('all');
+  const activeFilter = filter !== undefined ? filter : internalFilter;
+  const setFilter = onFilterChange || setInternalFilter;
+
   if (loading) return <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}</div>;
 
-  // Group rooms by floor (1 to 5)
+  const totalCount = rooms.length;
+  const availableCount = rooms.filter((r) => r.status === 'available').length;
+  const occupiedCount = rooms.filter((r) => r.status === 'occupied').length;
+
+  const visibleRooms = rooms.filter((r) => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'available') return r.status === 'available';
+    if (activeFilter === 'occupied') return r.status === 'occupied';
+    if (activeFilter === 'cleaning') return r.status === 'cleaning' || r.housekeepingStatus === 'dirty';
+    if (activeFilter === 'maintenance') return r.status === 'maintenance';
+    if (activeFilter === 'out_of_service') return r.status === 'out_of_service';
+    if (activeFilter === 'temp_non_ac') return r.isTemporary;
+    return true;
+  });
+
+  if (!rooms.length) {
+    return (
+      <EmptyState
+        title="No rooms found"
+        message="Add your first room to see room status."
+      />
+    );
+  }
+
+  // Group rooms by floor dynamically
   const floorMap = {};
-  rooms.forEach((r) => {
+  visibleRooms.forEach((r) => {
     const fl = r.floor || Math.floor(parseInt(r.roomNumber) / 100) || 1;
     (floorMap[fl] ||= []).push(r);
   });
 
-  const floors = [1, 2, 3, 4, 5];
+  const availableFloors = Object.keys(floorMap).map(Number).sort((a, b) => a - b);
+  const floors = availableFloors.length ? availableFloors : [1];
 
   const handleRoomClick = (r) => {
     if (r.currentBookingId) {
@@ -42,64 +72,151 @@ export function RoomStatusGrid({ rooms, loading, date }) {
 
   return (
     <div className="space-y-3.5">
-      {floors.map((fl) => {
-        const floorRooms = (floorMap[fl] || []).sort((a, b) => a.roomNumber.localeCompare(b.roomNumber));
-        const ordinal = ['1st', '2nd', '3rd', '4th', '5th'][fl - 1] || `${fl}th`;
-        return (
-          <div key={fl} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-            <span className="w-20 shrink-0 text-xs font-bold text-slate-500">{ordinal} Floor</span>
-            <div className="grid flex-1 grid-cols-5 gap-2 sm:grid-cols-10">
-              {floorRooms.map((r) => {
-                const styleKey = r.isTemporary ? 'temp_non_ac' : r.status;
-                const styleClass = ROOM_STYLES[styleKey] || 'bg-slate-50 border-slate-200 text-slate-700';
-                const isClickable = !!(r.currentBookingId || r.status === 'available');
-                return (
-                  <button
-                    key={r._id}
-                    onClick={() => handleRoomClick(r)}
-                    title={
-                      r.currentBookingId
-                        ? `Room ${r.roomNumber} (Occupied) • Click to view booking`
-                        : r.status === 'available'
-                        ? `Room ${r.roomNumber} (Available) • Click to create booking`
-                        : `Room ${r.roomNumber} · ${r.isTemporary ? 'Non-AC (Temporary)' : STATUS[r.status]?.label}`
-                    }
-                    className={cx(
-                      'flex flex-col items-center justify-center rounded-xl border p-2 transition-all hover:scale-105 hover:shadow-xs active:scale-95',
-                      styleClass,
-                      !isClickable && 'cursor-default'
-                    )}
-                  >
-                    <span className="text-xs font-extrabold tracking-tight">{r.roomNumber}</span>
-                    <span className="mt-0.5 truncate text-[10px] font-semibold opacity-90">
-                      {r.isTemporary ? 'Non-AC' : STATUS[r.status]?.label || 'Available'}
-                    </span>
-                  </button>
-                );
-              })}
+      {/* Quick Filter Buttons Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => setFilter('all')}
+            className={cx(
+              'px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5',
+              activeFilter === 'all'
+                ? 'bg-slate-800 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            )}
+          >
+            All Rooms ({totalCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter(activeFilter === 'available' ? 'all' : 'available')}
+            className={cx(
+              'px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5',
+              activeFilter === 'available'
+                ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-400'
+                : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+            )}
+          >
+            <i className={cx('h-2 w-2 rounded-full', activeFilter === 'available' ? 'bg-white' : 'bg-emerald-500')} />
+            Available Only ({availableCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter(activeFilter === 'occupied' ? 'all' : 'occupied')}
+            className={cx(
+              'px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5',
+              activeFilter === 'occupied'
+                ? 'bg-red-600 text-white shadow-xs ring-2 ring-red-400'
+                : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
+            )}
+          >
+            <i className={cx('h-2 w-2 rounded-full', activeFilter === 'occupied' ? 'bg-white' : 'bg-red-500')} />
+            Occupied ({occupiedCount})
+          </button>
+        </div>
+
+        {activeFilter !== 'all' && (
+          <button
+            type="button"
+            onClick={() => setFilter('all')}
+            className="text-[11px] font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+          >
+            Reset Filter
+          </button>
+        )}
+      </div>
+
+      {visibleRooms.length === 0 ? (
+        <div className="py-8 text-center text-xs font-semibold text-slate-500">
+          No rooms match the selected filter.
+        </div>
+      ) : (
+        floors.map((fl) => {
+          const floorRooms = (floorMap[fl] || []).sort((a, b) => a.roomNumber.localeCompare(b.roomNumber));
+          if (floorRooms.length === 0 && activeFilter !== 'all') return null;
+          const ordinal = ['1st', '2nd', '3rd', '4th', '5th'][fl - 1] || `${fl}th`;
+          return (
+            <div key={fl} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <span className="w-20 shrink-0 text-xs font-bold text-slate-500">{ordinal} Floor</span>
+              <div className="grid flex-1 grid-cols-5 gap-2 sm:grid-cols-10">
+                {floorRooms.map((r) => {
+                  const styleKey = r.isTemporary ? 'temp_non_ac' : r.status;
+                  const styleClass = ROOM_STYLES[styleKey] || 'bg-slate-50 border-slate-200 text-slate-700';
+                  const isClickable = !!(r.currentBookingId || r.status === 'available');
+                  return (
+                    <button
+                      key={r._id}
+                      onClick={() => handleRoomClick(r)}
+                      title={
+                        r.currentBookingId
+                          ? `Room ${r.roomNumber} (Occupied) • Click to view booking`
+                          : r.status === 'available'
+                          ? `Room ${r.roomNumber} (Available) • Click to create booking`
+                          : `Room ${r.roomNumber} · ${r.isTemporary ? 'Non-AC (Temporary)' : STATUS[r.status]?.label}`
+                      }
+                      className={cx(
+                        'flex flex-col items-center justify-center rounded-xl border p-2 transition-all hover:scale-105 hover:shadow-xs active:scale-95',
+                        styleClass,
+                        !isClickable && 'cursor-default'
+                      )}
+                    >
+                      <span className="text-xs font-extrabold tracking-tight">{r.roomNumber}</span>
+                      <span className="mt-0.5 truncate text-[10px] font-semibold opacity-90">
+                        {r.isTemporary ? 'Non-AC' : STATUS[r.status]?.label || 'Available'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })
+      )}
     </div>
   );
 }
 
-export const RoomLegend = () => (
-  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-    <ul className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs font-semibold text-slate-600">
-      <li className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Available</li>
-      <li className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-red-500" /> Occupied</li>
-      <li className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Cleaning</li>
-      <li className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-orange-500" /> Maintenance</li>
-      <li className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-rose-600" /> Out of service</li>
-      <li className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-purple-500" /> Non-AC (Temporary)</li>
-    </ul>
-    <Link to="/rooms" className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700">
-      View All Rooms <ChevronRight className="h-3.5 w-3.5" />
-    </Link>
-  </div>
-);
+export const RoomLegend = ({ activeFilter = 'all', onSelectFilter }) => {
+  const legendItems = [
+    { key: 'available', label: 'Available', color: 'bg-emerald-500' },
+    { key: 'occupied', label: 'Occupied', color: 'bg-red-500' },
+    { key: 'cleaning', label: 'Cleaning', color: 'bg-amber-400' },
+    { key: 'maintenance', label: 'Maintenance', color: 'bg-orange-500' },
+    { key: 'out_of_service', label: 'Out of service', color: 'bg-rose-600' },
+    { key: 'temp_non_ac', label: 'Non-AC (Temporary)', color: 'bg-purple-500' },
+  ];
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+      <ul className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs font-semibold text-slate-600">
+        {legendItems.map((item) => {
+          const isSelected = activeFilter === item.key;
+          return (
+            <li key={item.key}>
+              <button
+                type="button"
+                onClick={() => onSelectFilter?.(isSelected ? 'all' : item.key)}
+                className={cx(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all cursor-pointer',
+                  isSelected
+                    ? 'bg-slate-900 text-white font-bold shadow-xs'
+                    : 'hover:bg-slate-100'
+                )}
+                title={`Filter by ${item.label}`}
+              >
+                <i className={cx('h-2.5 w-2.5 rounded-full shrink-0', item.color)} />
+                <span>{item.label}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <Link to="/rooms" className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700">
+        View All Rooms <ChevronRight className="h-3.5 w-3.5" />
+      </Link>
+    </div>
+  );
+};
 
 export function QuickActionsWidget() {
   const { openWizard } = useUI();
@@ -152,7 +269,7 @@ export function ArrivalsListWidget({ arrivals }) {
               <div>
                 <p className="text-xs font-bold text-slate-900">{b.guest?.name}</p>
                 <p className="text-[11px] font-medium text-slate-500">
-                  Room {b.room?.roomNumber || 'TBD'} · {b.actualCheckIn ? fmtDateTime(b.actualCheckIn).split(', ')[1] : '2:00 PM'}
+                  Room {b.room?.roomNumber || 'TBD'} · {b.actualCheckIn ? fmtDateTime(b.actualCheckIn).split(', ')[1] : 'Expected today'}
                 </p>
               </div>
             </div>

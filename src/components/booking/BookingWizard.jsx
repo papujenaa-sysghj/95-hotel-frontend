@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useQuery } from '@tanstack/react-query';
-import { Check, BedDouble, Snowflake, Wind, Calendar, Search, User, Camera, Lightbulb, ArrowRight, X, Mail, MapPin, CreditCard as IdCard, Globe, FileText, Phone, Send, ShieldCheck, UserPlus } from 'lucide-react';
+import { Check, BedDouble, Snowflake, Wind, Calendar, Search, User, Camera, Lightbulb, ArrowRight, X, Mail, MapPin, CreditCard as IdCard, Globe, FileText, Phone, Send, ShieldCheck, UserPlus, DoorClosed, Ban, Lock } from 'lucide-react';
 import api, { unwrap, errMsg, openDocUrl } from '../../services/api';
 import { bookingApi } from '../../services/booking.api';
 import { useUI } from '../../store/ui';
@@ -28,8 +28,11 @@ export default function BookingWizard() {
 }
 
 function WizardInner({ opts, onClose, onDone }) {
-  const can = useCan(); const walkIn = !!opts.walkIn; const [step, setStep] = useState(0); const [room, setRoom] = useState(null); const [payMode, setPayMode] = useState('unpaid'); const [known, setKnown] = useState(null);
+  const can = useCan(); const walkIn = !!opts.walkIn; const [step, setStep] = useState(0); const [selectedRooms, setSelectedRooms] = useState([]); const [payMode, setPayMode] = useState('unpaid'); const [known, setKnown] = useState(null);
   const [guestMode, setGuestMode] = useState('new'); // 'new' or 'search'
+  const [showAvailableOnly, setShowAvailableOnly] = useState(true);
+  const [wizardFloorFilter, setWizardFloorFilter] = useState('all');
+  const [wizardSearch, setWizardSearch] = useState('');
   const t = iso(today());
   const f = useForm({
     mode: 'onTouched',
@@ -128,17 +131,44 @@ function WizardInner({ opts, onClose, onDone }) {
     queryFn: () => bookingApi.availability({ checkInDate: v.checkInDate, checkOutDate: v.checkOutDate, adults: v.adults, children: v.children })
   });
 
-  useEffect(() => { if (opts.roomId && avail.data && !room) { const r = avail.data.rooms.find((x) => x._id === opts.roomId); if (r) pick(r); } }, [avail.data]);
-  const pick = (r) => { setRoom(r); f.setValue('roomRate', r.sellablePrice); };
+  useEffect(() => {
+    if (opts.roomId && (avail.data?.rooms || avail.data?.allRooms) && selectedRooms.length === 0) {
+      const pool = avail.data.rooms || avail.data.allRooms || [];
+      const r = pool.find((x) => x._id === opts.roomId);
+      if (r && r.isAvailable !== false) {
+        setSelectedRooms([r]);
+        f.setValue('roomRate', r.sellablePrice);
+      }
+    }
+  }, [avail.data, opts.roomId]);
 
-  const create = useMutate((b) => bookingApi.create(b), { success: (d) => `Booking ${d.booking.bookingNumber} created`, invalidate: ['calendar', 'bookings', 'dashboard', 'arrivals'], onSuccess: (d) => onDone(d.booking._id) });
+  const toggleRoom = (r) => {
+    if (r.isAvailable === false) {
+      f.setError('root', { message: `Room ${r.roomNumber} is unavailable (${r.unavailabilityDetail || 'Occupied/Blocked'}). Please select an available room.` });
+      return;
+    }
+    f.clearErrors('root');
+    setSelectedRooms((prev) => {
+      const exists = prev.some((x) => x._id === r._id);
+      const updated = exists ? prev.filter((x) => x._id !== r._id) : [...prev, r];
+      const combinedPrice = updated.reduce((sum, item) => sum + (item.sellablePrice || 0), 0);
+      f.setValue('roomRate', combinedPrice);
+      return updated;
+    });
+  };
+
+  const create = useMutate((b) => bookingApi.create(b), {
+    success: (d) => selectedRooms.length > 1 ? `Group Booking (${selectedRooms.length} rooms) created successfully` : `Booking ${d.booking.bookingNumber} created`,
+    invalidate: ['calendar', 'bookings', 'dashboard', 'arrivals', 'monthly-calendar'],
+    onSuccess: (d) => onDone(d.booking._id)
+  });
   const lookup = async () => { const p = f.getValues('phone'); if (p.length < 7) return; try { const d = await unwrap(api.get('/guests', { params: { q: p, limit: 1 } })); setKnown(d.items[0] || null); } catch { setKnown(null); } };
   const useKnown = () => { Object.entries({ guestName: known.name, email: known.email || '', address: known.address || '', idType: known.idType || 'Aadhaar', idNumber: known.idNumber || '', idDocumentUrl: known.idDocumentUrl || '' }).forEach(([k, val]) => f.setValue(k, val)); setKnown(null); };
 
   const next = async () => {
     const schema = stepSchemas[step];
     if (schema) { const r = schema.safeParse(v); if (!r.success) { r.error.issues.forEach((i) => f.setError(i.path[0], { message: i.message })); return; } }
-    if (step === 2 && !room) return f.setError('root', { message: 'Choose a room to continue.' });
+    if (step === 2 && selectedRooms.length === 0) return f.setError('root', { message: 'Please select at least 1 available room to continue.' });
     if (step === 4) { const amt = Number(v.payAmount) || 0; if (payMode !== 'unpaid' && amt <= 0) return f.setError('payAmount', { message: 'Enter the amount received.' }); if (amt > totals.total) return f.setError('payAmount', { message: `Amount cannot exceed the total of ${money(totals.total)}.` }); }
     setStep(step + 1);
   };
@@ -146,13 +176,25 @@ function WizardInner({ opts, onClose, onDone }) {
   const submit = () => {
     const amt = payMode === 'unpaid' ? 0 : Number(v.payAmount);
     const validCoGuests = coGuests.filter((cg) => cg.name?.trim() || cg.idNumber?.trim() || cg.idDocumentUrl);
+    const primaryRoom = selectedRooms[0];
     create.mutate({
       guest: { name: v.guestName, phone: v.phone, email: v.email || undefined, address: v.address || undefined, idType: v.idType || undefined, idNumber: v.idNumber || undefined, idDocumentUrl: v.idDocumentUrl || undefined, ...(known?._id && { _id: known._id }) },
       coGuests: validCoGuests,
-      room: room._id, checkInDate: v.checkInDate, checkOutDate: v.checkOutDate, adults: Number(v.adults), children: Number(v.children),
+      room: primaryRoom?._id,
+      rooms: selectedRooms.map((r) => r._id),
+      checkInDate: v.checkInDate,
+      checkOutDate: v.checkOutDate,
+      adults: Number(v.adults),
+      children: Number(v.children),
       ...(can('bookings.edit_rate') ? { roomRate: Number(v.roomRate) } : {}),
-      extraBedCharge: Number(v.extraBedCharge), otherCharges: Number(v.otherCharges), discount: Number(v.discount), taxPercent: activeTaxPercent, source: walkIn ? 'walk_in' : 'reception', notes: v.notes || undefined,
-      checkInNow: v.checkInNow && v.checkInDate === t, ...(amt > 0 && { payment: { amount: amt, method: v.payMethod } })
+      extraBedCharge: Number(v.extraBedCharge),
+      otherCharges: Number(v.otherCharges),
+      discount: Number(v.discount),
+      taxPercent: activeTaxPercent,
+      source: walkIn ? 'walk_in' : 'reception',
+      notes: v.notes || undefined,
+      checkInNow: v.checkInNow && v.checkInDate === t,
+      ...(amt > 0 && { payment: { amount: amt, method: v.payMethod } })
     });
   };
   const err = (k) => f.formState.errors[k]?.message;
@@ -635,44 +677,226 @@ function WizardInner({ opts, onClose, onDone }) {
 
       {/* Step 2: Select Room */}
       {step === 2 && (
-        <div>
-          {err('root') && <p className="mb-3 text-xs font-bold text-red-600">{err('root')}</p>}
-          {avail.isLoading ? (
-            <div className="grid gap-3 sm:grid-cols-2">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24" />)}</div>
-          ) : avail.isError ? (
-            <ErrorState error={avail.error} onRetry={() => avail.refetch()} />
-          ) : !avail.data?.rooms?.length ? (
-            <EmptyState title="No rooms free for these dates" message="Try different dates, or check the room calendar." />
-          ) : (
-            <div className="grid max-h-[46vh] gap-3 overflow-y-auto sm:grid-cols-2">
-              {avail.data.rooms.map((r) => {
-                return (
-                  <button
-                    key={r._id}
-                    onClick={() => pick(r)}
-                    className={cx(
-                      'rounded-2xl border p-3.5 text-left transition-all',
-                      room?._id === r._id ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300'
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 font-bold text-slate-900">
-                        <BedDouble className="h-4 w-4 text-blue-600" /> Room {r.roomNumber}
-                      </span>
-                      <span className="font-extrabold text-blue-600">{money(r.sellablePrice)}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {r.roomType?.name} · Floor {r.floor} ·{' '}
-                      <span className={cx('inline-flex items-center gap-1 font-semibold', r.sellableIsAC ? 'text-sky-600' : 'text-purple-600')}>
-                        {r.sellableIsAC ? <Snowflake className="h-3 w-3" /> : <Wind className="h-3 w-3" />}
-                        {r.sellableIsAC ? 'AC' : 'Non-AC'}
-                      </span>
-                    </p>
-                  </button>
-                );
-              })}
+        <div className="space-y-3">
+          {err('root') && <p className="text-xs font-bold text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200">{err('root')}</p>}
+
+          {/* Selection Status & Multi-room Banner */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-3.5 text-xs text-blue-900">
+            <div>
+              <p className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                <BedDouble className="h-4 w-4 text-blue-600" />
+                <span>
+                  {selectedRooms.length === 0
+                    ? 'Select 1 or more rooms for this booking'
+                    : `${selectedRooms.length} Room${selectedRooms.length > 1 ? 's' : ''} Selected: ${selectedRooms.map((r) => `Room ${r.roomNumber}`).join(', ')}`}
+                </span>
+              </p>
+              <p className="text-[11px] text-blue-700 font-semibold mt-0.5">
+                {selectedRooms.length > 0
+                  ? `Combined room rate: ${money(selectedRooms.reduce((s, r) => s + (r.sellablePrice || 0), 0))}/night • Click any available room to add or remove`
+                  : 'Click on one or more rooms below to book them together.'}
+              </p>
             </div>
-          )}
+            {selectedRooms.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRooms([]);
+                  f.setValue('roomRate', 0);
+                }}
+                className="text-[11px] font-bold text-blue-700 hover:text-blue-900 underline self-start sm:self-auto"
+              >
+                Clear selection
+              </button>
+            )}
+          </div>
+
+          {/* Availability Filter & Search Toolbar */}
+          {(() => {
+            const rawRooms = avail.data?.allRooms || avail.data?.rooms || [];
+            const availRooms = avail.data?.rooms || rawRooms.filter((r) => r.isAvailable !== false);
+            const unavailRooms = rawRooms.filter((r) => r.isAvailable === false);
+            const availCount = avail.data?.availableCount ?? availRooms.length;
+            const unavailCount = avail.data?.unavailableCount ?? unavailRooms.length;
+
+            let displayedList = showAvailableOnly ? availRooms : rawRooms;
+            if (wizardFloorFilter !== 'all') {
+              displayedList = displayedList.filter((r) => String(r.floor) === String(wizardFloorFilter));
+            }
+            if (wizardSearch.trim()) {
+              const q = wizardSearch.toLowerCase().trim();
+              displayedList = displayedList.filter((r) =>
+                String(r.roomNumber).toLowerCase().includes(q) ||
+                String(r.roomType?.name || '').toLowerCase().includes(q)
+              );
+            }
+
+            return (
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2 text-xs">
+                  {/* View Toggles */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowAvailableOnly(true)}
+                      className={cx(
+                        'flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all cursor-pointer',
+                        showAvailableOnly
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                      )}
+                    >
+                      <span className={cx('h-2 w-2 rounded-full', showAvailableOnly ? 'bg-white' : 'bg-emerald-500')} />
+                      <span>Available Only</span>
+                      <span className={cx('rounded-full px-1.5 py-0.2 text-[10px] font-black', showAvailableOnly ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700')}>
+                        {availCount}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAvailableOnly(false)}
+                      className={cx(
+                        'flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all cursor-pointer',
+                        !showAvailableOnly
+                          ? 'bg-slate-800 text-white shadow-xs'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                      )}
+                    >
+                      <span>All Rooms</span>
+                      <span className={cx('rounded-full px-1.5 py-0.2 text-[10px] font-black', !showAvailableOnly ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-700')}>
+                        {rawRooms.length}
+                      </span>
+                      {unavailCount > 0 && (
+                        <span className="rounded-full bg-red-500 px-1.5 py-0.2 text-[10px] font-black text-white">
+                          {unavailCount} in red
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Floor & Search Filter */}
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={wizardFloorFilter}
+                      onChange={(e) => setWizardFloorFilter(e.target.value)}
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500"
+                    >
+                      <option value="all">All Floors</option>
+                      <option value="1">Floor 1</option>
+                      <option value="2">Floor 2</option>
+                      <option value="3">Floor 3</option>
+                      <option value="4">Floor 4</option>
+                      <option value="5">Floor 5</option>
+                    </select>
+                    <div className="relative">
+                      <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Search room..."
+                        value={wizardSearch}
+                        onChange={(e) => setWizardSearch(e.target.value)}
+                        className="rounded-lg border border-slate-200 bg-white pl-7 pr-2 py-1 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 w-28 sm:w-32"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {avail.isLoading ? (
+                  <div className="grid gap-3 sm:grid-cols-2">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24" />)}</div>
+                ) : avail.isError ? (
+                  <ErrorState error={avail.error} onRetry={() => avail.refetch()} />
+                ) : displayedList.length === 0 ? (
+                  <EmptyState 
+                    title={showAvailableOnly ? "No available rooms for these dates" : "No rooms match your filter"} 
+                    message={showAvailableOnly ? "Try selecting different dates or click 'All Rooms' to check occupied rooms." : "Try resetting the floor filter or search query."} 
+                  />
+                ) : (
+                  <div className="grid max-h-[46vh] gap-3 overflow-y-auto custom-scrollbar sm:grid-cols-2">
+                    {displayedList.map((r) => {
+                      const isAvail = r.isAvailable !== false;
+                      const isSelected = selectedRooms.some((x) => x._id === r._id);
+
+                      if (!isAvail) {
+                        return (
+                          <div
+                            key={r._id}
+                            onClick={() => toggleRoom(r)}
+                            className="rounded-2xl border border-red-300 bg-red-50/70 p-3.5 text-left transition-all relative select-none cursor-not-allowed shadow-2xs opacity-90 hover:opacity-100"
+                            title={`Room ${r.roomNumber} is unavailable: ${r.unavailabilityDetail || 'Occupied / Maintenance'}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-2 font-bold text-red-950">
+                                <DoorClosed className="h-4 w-4 text-red-600" />
+                                <span>Room {r.roomNumber}</span>
+                                <span className="rounded-full bg-red-100 border border-red-300 px-2 py-0.5 text-[10px] font-extrabold text-red-700 flex items-center gap-1">
+                                  <Ban className="h-2.5 w-2.5 text-red-600" />
+                                  {r.unavailabilityDetail || 'Occupied'}
+                                </span>
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-red-400 line-through">{money(r.sellablePrice)}</span>
+                                <span className="rounded-md bg-red-200/80 px-2 py-0.5 text-[10px] font-black text-red-800 uppercase tracking-tight">
+                                  Unavailable
+                                </span>
+                              </div>
+                            </div>
+                            <p className="mt-1.5 text-xs text-red-700/80 font-medium">
+                              {r.roomType?.name} · Floor {r.floor} ·{' '}
+                              <span className="text-red-600 font-semibold">
+                                {r.unavailabilityReason === 'maintenance' ? 'Under Maintenance' : r.unavailabilityReason === 'out_of_service' ? 'Out of Service' : 'Occupied for selected stay dates'}
+                              </span>
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={r._id}
+                          type="button"
+                          onClick={() => toggleRoom(r)}
+                          className={cx(
+                            'rounded-2xl border p-3.5 text-left transition-all relative select-none cursor-pointer',
+                            isSelected
+                              ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-500 shadow-xs'
+                              : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/60'
+                          )}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-2 font-bold text-slate-900">
+                              <BedDouble className={cx('h-4 w-4', isSelected ? 'text-blue-600' : 'text-emerald-600')} />
+                              <span>Room {r.roomNumber}</span>
+                              <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.2 text-[10px] font-bold text-emerald-700">
+                                Available
+                              </span>
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-blue-600">{money(r.sellablePrice)}</span>
+                              <div className={cx(
+                                'h-5 w-5 rounded-full flex items-center justify-center border text-[11px] font-black transition-all',
+                                isSelected
+                                  ? 'bg-blue-600 border-blue-600 text-white'
+                                  : 'border-slate-300 text-transparent'
+                              )}>
+                                ✓
+                              </div>
+                            </div>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {r.roomType?.name} · Floor {r.floor} ·{' '}
+                            <span className={cx('inline-flex items-center gap-1 font-semibold', r.sellableIsAC ? 'text-sky-600' : 'text-purple-600')}>
+                              {r.sellableIsAC ? <Snowflake className="h-3 w-3" /> : <Wind className="h-3 w-3" />}
+                              {r.sellableIsAC ? 'AC' : 'Non-AC'}
+                            </span>
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -680,7 +904,10 @@ function WizardInner({ opts, onClose, onDone }) {
       {step === 3 && (
         <div className="space-y-4">
           <div className="grid gap-3.5 sm:grid-cols-2">
-            <Field label="Room Rate Per Night" hint={!can('bookings.edit_rate') ? 'Only managers can change rate.' : undefined}>
+            <Field
+              label={`Room Rate Per Night (${selectedRooms.length > 1 ? `${selectedRooms.length} Rooms: ${selectedRooms.map((r) => r.roomNumber).join(', ')}` : selectedRooms[0] ? `Room ${selectedRooms[0].roomNumber}` : 'Total'})`}
+              hint={!can('bookings.edit_rate') ? 'Only managers can change rate.' : undefined}
+            >
               <input type="number" className="input font-bold" disabled={!can('bookings.edit_rate')} {...f.register('roomRate')} />
             </Field>
             <Field label="Nights">
@@ -831,7 +1058,7 @@ function WizardInner({ opts, onClose, onDone }) {
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
             {[
               ['Primary Guest', `${v.guestName} (${v.phone})`],
-              ['Room Selected', `${room?.roomNumber} · ${room?.roomType?.name}`],
+              ['Room(s) Booked', selectedRooms.map((r) => `Room ${r.roomNumber} (${r.roomType?.name || 'Standard'})`).join(' • ')],
               ['Dates', `${v.checkInDate} → ${v.checkOutDate} (${nights} nights)`],
               ['Occupants Count', `${v.adults} Adults, ${v.children} Children`],
               ['Total Amount', money(totals.total)],

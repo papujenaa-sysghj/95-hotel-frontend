@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import { BedDouble, DoorOpen, DoorClosed, Wrench, Ban, IndianRupee, TrendingUp, ChevronRight } from 'lucide-react';
 import { dashboardApi } from '../../services/resource.api';
+import api, { unwrap } from '../../services/api';
+import { useAuth } from '../../store/auth';
 import { Card, Stat, QueryBoundary, Skeleton } from '../../components/common/ui';
 import { RoomStatusGrid, RoomLegend, QuickActionsWidget, ArrivalsListWidget, DeparturesListWidget, BookingList, recentCols, ActivityList } from '../../components/dashboard/widgets';
 import { money } from '../../utils/format';
@@ -13,6 +15,7 @@ const TYPE_COLORS = ['#2563EB', '#10B981', '#3B82F6', '#8B5CF6'];
 export default function AdminDashboard() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const [statusDate, setStatusDate] = useState(todayStr);
+  const [overviewFilter, setOverviewFilter] = useState('all');
   const [range, setRange] = useState('7');
   const q = useQuery({ queryKey: ['dashboard', statusDate], queryFn: () => dashboardApi.summary({ date: statusDate }), refetchInterval: 60000 });
   const days = Number(range);
@@ -20,6 +23,10 @@ export default function AdminDashboard() {
   const rev = useQuery({ queryKey: ['dashboard', 'rev', 'day'], queryFn: () => dashboardApi.revenue({ group: 'day', from: new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10) }) });
 
   const s = q.data?.stats;
+
+  const user = useAuth((s) => s.user);
+  const settingsQ = useQuery({ queryKey: ['settings'], queryFn: () => unwrap(api.get('/settings')), staleTime: 300000 });
+  const hotelName = settingsQ.data?.hotel?.name || 'GS Hotels';
 
   const occSeries = useMemo(() => {
     const x = occ.data?.series || [];
@@ -30,19 +37,13 @@ export default function AdminDashboard() {
     const x = rev.data?.series || [];
     return x.map((d) => ({
       period: d.period.slice(5),
-      roomRevenue: Math.round(d.collected * 0.8),
-      otherRevenue: Math.round(d.collected * 0.2),
+      roomRevenue: d.collected || 0,
+      otherRevenue: 0,
     }));
   }, [rev.data]);
 
   const roomTypesData = useMemo(() => {
-    const defaultData = [
-      { name: 'Standard', count: 15, rate: 75, color: '#3B82F6' },
-      { name: 'Deluxe', count: 20, rate: 60, color: '#10B981' },
-      { name: 'Suite', count: 10, rate: 50, color: '#F59E0B' },
-      { name: 'Executive', count: 5, rate: 40, color: '#8B5CF6' },
-    ];
-    if (!q.data?.roomTypeOccupancy?.length) return defaultData;
+    if (!q.data?.roomTypeOccupancy?.length) return [];
     return q.data.roomTypeOccupancy.map((t, i) => ({
       name: t.name,
       count: t.total,
@@ -51,7 +52,7 @@ export default function AdminDashboard() {
     }));
   }, [q.data]);
 
-  const occRate = s?.totalRooms ? Math.round((s.occupied / s.totalRooms) * 100) : 68;
+  const occRate = s?.totalRooms ? Math.round((s.occupied / s.totalRooms) * 100) : 0;
 
   return (
     <div className="space-y-5 pb-8">
@@ -59,10 +60,10 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-gradient-to-r from-slate-50 via-white to-blue-50/40 p-5 shadow-2xs">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
-            Welcome back, Admin! <span className="animate-bounce">👋</span>
+            Welcome back, {user?.name || 'Admin'}! <span className="animate-bounce">👋</span>
           </h1>
           <p className="mt-1 text-xs font-medium text-slate-500 sm:text-sm">
-            Here's what's happening at Hotel Bliss today.
+            Here's what's happening at {hotelName} today.
           </p>
         </div>
         <div className="flex items-center gap-3.5 rounded-xl border border-blue-100 bg-white p-3 shadow-xs">
@@ -222,43 +223,51 @@ export default function AdminDashboard() {
 
         {/* Room Type Wise Occupancy Donut Chart */}
         <Card title="Room Type Wise Occupancy">
-          <div className="flex items-center gap-4 py-2">
-            <div className="relative h-44 w-44 shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={roomTypesData}
-                    dataKey="count"
-                    nameKey="name"
-                    innerRadius={50}
-                    outerRadius={72}
-                    paddingAngle={3}
-                  >
-                    {roomTypesData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value, name) => [`${value} rooms`, name]} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                <span className="text-xl font-extrabold text-slate-900">{occRate}%</span>
-                <span className="text-[10px] font-semibold text-slate-400">Occupied</span>
+          {roomTypesData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400">
+              <BedDouble className="h-8 w-8 mb-2 opacity-40 text-slate-400" />
+              <p className="text-xs font-bold text-slate-600">No room type occupancy data</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Occupancy breakdown by room category will appear here.</p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4 py-2">
+              <div className="relative h-44 w-44 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={roomTypesData}
+                      dataKey="count"
+                      nameKey="name"
+                      innerRadius={50}
+                      outerRadius={72}
+                      paddingAngle={3}
+                    >
+                      {roomTypesData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value, name) => [`${value} rooms`, name]} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                  <span className="text-xl font-extrabold text-slate-900">{occRate}%</span>
+                  <span className="text-[10px] font-semibold text-slate-400">Occupied</span>
+                </div>
+              </div>
+
+              <div className="flex-1 space-y-2.5">
+                {roomTypesData.map((t) => (
+                  <div key={t.name} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <i className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: t.color }} />
+                      <span className="font-semibold text-slate-700">{t.name} ({t.count})</span>
+                    </div>
+                    <span className="font-extrabold text-slate-900">{t.rate}%</span>
+                  </div>
+                ))}
               </div>
             </div>
-
-            <div className="flex-1 space-y-2.5">
-              {roomTypesData.map((t) => (
-                <div key={t.name} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <i className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: t.color }} />
-                    <span className="font-semibold text-slate-700">{t.name} ({t.count})</span>
-                  </div>
-                  <span className="font-extrabold text-slate-900">{t.rate}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
         </Card>
       </div>
 
@@ -291,8 +300,8 @@ export default function AdminDashboard() {
             pad
           >
             <QueryBoundary q={q} skeleton={<Skeleton className="h-64" />}>
-              <RoomStatusGrid rooms={q.data?.roomGrid || []} date={statusDate} />
-              <RoomLegend />
+              <RoomStatusGrid rooms={q.data?.roomGrid || []} date={statusDate} filter={overviewFilter} onFilterChange={setOverviewFilter} />
+              <RoomLegend activeFilter={overviewFilter} onSelectFilter={setOverviewFilter} />
             </QueryBoundary>
           </Card>
 

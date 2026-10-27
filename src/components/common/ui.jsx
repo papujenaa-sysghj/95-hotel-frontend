@@ -223,7 +223,11 @@ export const Tabs = ({ tabs, value, onChange }) => (
   </div>
 );
 
-export function DataTable({ columns, rows, onRowClick, rowKey = '_id' }) {
+export function DataTable({ columns, rows = [], onRowClick, rowKey = '_id', emptyTitle = 'No records found', emptyMessage = 'There are no records to display.' }) {
+  if (!rows || rows.length === 0) {
+    return <EmptyState title={emptyTitle} message={emptyMessage} />;
+  }
+
   return (
     <div className="overflow-x-auto cal-scroll">
       <table className="w-full min-w-[600px] text-left">

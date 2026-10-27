@@ -2,6 +2,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, ConciergeBell, CalendarRange, Calendar, BookOpenCheck, LogIn, LogOut, Users, BedDouble, SprayCan, Wrench, CreditCard, FileText, BarChart3, Percent, ShieldCheck, ScrollText, Settings, Hotel, X } from 'lucide-react';
 import { useAuth } from '../../store/auth';
 import { useUI } from '../../store/ui';
+import { useQuery } from '@tanstack/react-query';
+import api, { unwrap } from '../../services/api';
 import { cx } from '../common/ui';
 
 const NAV = [
@@ -41,6 +43,8 @@ const NAV = [
 export default function Sidebar() {
   const location = useLocation();
   const user = useAuth((s) => s.user); const can = useAuth((s) => s.can); const { sidebar, toggleSidebar } = useUI();
+  const settingsQ = useQuery({ queryKey: ['settings'], queryFn: () => unwrap(api.get('/settings')), staleTime: 300000 });
+  const hotelName = settingsQ.data?.hotel?.name || 'GS Hotels';
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => i.show(user, can)) })).filter((g) => g.items.length);
 
   const isNavItemActive = (to) => {
@@ -64,12 +68,12 @@ export default function Sidebar() {
       )}
     >
       <div className="flex h-16 items-center justify-between border-b border-slate-800/60 px-4 sm:px-5 shrink-0">
-        <div className="flex items-center gap-3 text-white">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
+        <div className="flex items-center gap-3 text-white min-w-0">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20">
             <Hotel className="h-5 w-5" />
           </span>
-          <div>
-            <span className="block text-base font-extrabold leading-none tracking-tight">Hotel Bliss</span>
+          <div className="min-w-0">
+            <span className="block text-base font-extrabold leading-none tracking-tight truncate max-w-[170px]">{hotelName}</span>
             <span className="mt-0.5 block text-[10px] font-medium text-slate-400">Property Management System</span>
           </div>
         </div>
