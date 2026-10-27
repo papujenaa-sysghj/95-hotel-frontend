@@ -15,10 +15,8 @@ dist-ssr
 
 # Environment configuration
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+.env.example
 
 # IDE & OS files
 .vscode/*
